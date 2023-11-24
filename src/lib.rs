@@ -7,6 +7,7 @@ use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::ptr;
 
 use once_cell::race::OnceNonZeroUsize;
+use wide::L;
 pub use windows::core::{Error, Result};
 use windows::core::{Interface, BSTR, PCWSTR};
 use windows::Win32::Devices::Display::{
@@ -264,26 +265,23 @@ impl Monitor {
 impl Monitor {
     fn get_wmi_instance_name(&self) -> Vec<u16> {
         let mut id: Vec<u16> = self.id.encode_wide().collect();
-        if id
-            .strip_prefix(&[b'\\' as u16, b'\\' as u16, b'?' as u16, b'\\' as u16])
-            .is_some()
-        {
+        if id.strip_prefix(&L!("\\\\?\\")).is_some() {
             id.drain(..4);
         } else {
             debug_assert!(false, "id not starts with '\\\\?\\'");
         }
         let mut last_hash = 0;
         for (i, ch) in id.iter_mut().enumerate() {
-            if *ch == b'#' as u16 {
-                *ch = b'\\' as u16;
+            if *ch == L!('#') {
+                *ch = L!('\\');
                 last_hash = i;
             }
         }
         debug_assert_ne!(last_hash, 0);
         debug_assert_eq!(id.len() - last_hash, 39);
         id.truncate(last_hash);
-        id.push(b'_' as u16);
-        id.push(b'0' as u16);
+        id.push(L!('_'));
+        id.push(L!('0'));
         id
     }
 
@@ -291,14 +289,12 @@ impl Monitor {
         let query = format!("SELECT * FROM {class} WHERE InstanceName=\"");
         let mut query: Vec<_> = query.encode_utf16().collect();
         let instance_name = self.get_wmi_instance_name();
-        query.extend(instance_name.into_iter().flat_map(|ch| {
-            match ch {
-                /* \\ */ 92 => [ch, ch].into_iter().take(2),
-                /* \" */ 34 => [92, ch].into_iter().take(2),
-                ch => [ch, 0].into_iter().take(1),
-            }
+        query.extend(instance_name.into_iter().flat_map(|ch| match ch {
+            L!('\\') => [ch, ch].into_iter().take(2),
+            L!('"') => [L!('\\'), ch].into_iter().take(2),
+            ch => [ch, 0].into_iter().take(1),
         }));
-        query.push(34);
+        query.push(L!('"'));
         query_wmi(&query)
     }
 
@@ -307,12 +303,7 @@ impl Monitor {
             return Ok(None);
         };
         let mut variant: mem::MaybeUninit<VARIANT> = mem::MaybeUninit::uninit();
-        let user_friendly_name = PCWSTR::from_raw(
-            [
-                85, 115, 101, 114, 70, 114, 105, 101, 110, 100, 108, 121, 78, 97, 109, 101, 0,
-            ]
-            .as_ptr(),
-        );
+        let user_friendly_name = PCWSTR::from_raw(L!("UserFriendlyName").as_ptr());
         unsafe { instance.Get(user_friendly_name, 0, variant.as_mut_ptr(), None, None) }?;
         let mut variant = unsafe { variant.assume_init() };
         let s = ((unsafe { &variant.Anonymous.Anonymous }.vt.0 & VT_ARRAY.0) != 0)
@@ -374,16 +365,7 @@ static WMI_SERVICES: OnceNonZeroUsize = OnceNonZeroUsize::new();
 fn create_wmi_services() -> Result<IWbemServices> {
     let locator: IWbemLocator =
         unsafe { CoCreateInstance(&WbemLocator, None, CLSCTX_INPROC_SERVER) }?;
-    let resource = BSTR::from_wide(&[
-        b'r' as u16,
-        b'o' as u16,
-        b'o' as u16,
-        b't' as u16,
-        b'\\' as u16,
-        b'W' as u16,
-        b'M' as u16,
-        b'I' as u16,
-    ])?;
+    let resource = BSTR::from_wide(&L!("root\\WMI"))?;
     unsafe {
         locator.ConnectServer(
             &resource,
@@ -411,7 +393,7 @@ fn get_wmi_services() -> Result<IWbemServices> {
 
 fn query_wmi(query: &[u16]) -> Result<Option<IWbemClassObject>> {
     let services = get_wmi_services()?;
-    let wql = BSTR::from_wide(&[b'W' as u16, b'Q' as u16, b'L' as u16])?;
+    let wql = BSTR::from_wide(&L!("WQL"))?;
     let query = BSTR::from_wide(query)?;
     let enumerator = unsafe { services.ExecQuery(&wql, &query, WBEM_FLAG_FORWARD_ONLY, None) }?;
     let mut objects = [None; 1];

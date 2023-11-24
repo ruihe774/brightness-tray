@@ -19,6 +19,9 @@ features = [
 [dependencies.once_cell]
 version = "1.18"
 
+[dependencies.wide]
+path = "wide"
+
 [[bin]]
 name = "list-monitors"
 path = "src/bin/list_monitors.rs"
