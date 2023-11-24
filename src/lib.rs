@@ -53,7 +53,7 @@ fn pcwstr_to_osstring(s: &[u16]) -> OsString {
     OsString::from_wide(&s[..len])
 }
 
-fn get_monitor_ids() -> BTreeMap<String, OsString> {
+fn get_monitor_ids() -> BTreeMap<OsString, OsString> {
     fn get_display_device(
         device_name: Option<&[u16]>,
         device_num: u32,
@@ -70,7 +70,7 @@ fn get_monitor_ids() -> BTreeMap<String, OsString> {
             )
         }
         .as_bool()
-        .then_some(unsafe { device.assume_init() })
+        .then(|| unsafe { device.assume_init() })
     }
 
     let mut monitor_ids = BTreeMap::new();
@@ -90,10 +90,7 @@ fn get_monitor_ids() -> BTreeMap<String, OsString> {
                 & (DISPLAY_DEVICE_ATTACHED_TO_DESKTOP | DISPLAY_DEVICE_MIRRORING_DRIVER))
                 == DISPLAY_DEVICE_ATTACHED_TO_DESKTOP
             {
-                let Ok(name) = pcwstr_to_osstring(&monitor.DeviceName).into_string() else {
-                    // XXX: we cannot handle this
-                    continue;
-                };
+                let name = pcwstr_to_osstring(&monitor.DeviceName);
                 let id = pcwstr_to_osstring(&monitor.DeviceID);
                 monitor_ids.insert(name, id);
             }
@@ -103,28 +100,30 @@ fn get_monitor_ids() -> BTreeMap<String, OsString> {
     monitor_ids
 }
 
-fn get_monitors_ddcci(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<String, OsString>) {
+fn get_monitors_ddcci(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<OsString, OsString>) {
     fn get_monitor_info(hmonitor: HMONITOR) -> Option<MONITORINFOEXW> {
         let mut info: mem::MaybeUninit<MONITORINFOEXW> = mem::MaybeUninit::uninit();
         unsafe { info.assume_init_mut() }.monitorInfo.cbSize =
             mem::size_of::<MONITORINFOEXW>() as u32;
         unsafe { GetMonitorInfoW(hmonitor, mem::transmute(info.as_mut_ptr())) }
             .as_bool()
-            .then_some(unsafe { info.assume_init() })
+            .then(|| unsafe { info.assume_init() })
     }
 
     fn get_physical_monitors_from_hmonitor(hmonitor: HMONITOR) -> Vec<PHYSICAL_MONITOR> {
         let mut num = 0;
         let _ = unsafe { GetNumberOfPhysicalMonitorsFromHMONITOR(hmonitor, &mut num) };
-        if num == 0 {
-            Vec::new()
-        } else {
-            let num = num as usize;
-            let mut v = Vec::with_capacity(num);
-            unsafe { v.set_len(num) };
-            unsafe { GetPhysicalMonitorsFromHMONITOR(hmonitor, v.as_mut_slice()) }
-                .map_or(Vec::new(), |()| v)
-        }
+        (num != 0)
+            .then(|| {
+                let num = num as usize;
+                let mut v = Vec::with_capacity(num);
+                unsafe { v.set_len(num) };
+                unsafe { GetPhysicalMonitorsFromHMONITOR(hmonitor, v.as_mut_slice()) }.map(|()| v)
+            })
+            .transpose()
+            .ok()
+            .flatten()
+            .unwrap_or_default()
     }
 
     unsafe extern "system" fn monitor_enum_proc(
@@ -152,18 +151,18 @@ fn get_monitors_ddcci(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<St
         let Some(info) = get_monitor_info(hmonitor) else {
             continue;
         };
-        let Ok(mut name) = pcwstr_to_osstring(&info.szDevice).into_string() else {
-            // XXX: we cannot handle this
-            continue;
-        };
+        let display_name = pcwstr_to_osstring(&info.szDevice);
         let physical_monitors = get_physical_monitors_from_hmonitor(hmonitor);
         for (i, phy) in physical_monitors.into_iter().enumerate() {
-            let orig_len = name.len();
-            write!(name, "\\Monitor{i}").unwrap();
-            let id = monitor_ids.remove(&name);
-            name.truncate(orig_len);
+            let mut monitor_name = display_name.clone();
+            write!(monitor_name, "\\Monitor{i}").unwrap();
+            let id = monitor_ids.remove(&monitor_name);
             let Some(id) = id else {
-                debug_assert!(false, "the device of '{name}\\Monitor{i}' not found");
+                debug_assert!(
+                    false,
+                    "the device of '{}' not found",
+                    monitor_name.to_string_lossy()
+                );
                 continue;
             };
             monitors.push(Monitor {
@@ -174,7 +173,7 @@ fn get_monitors_ddcci(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<St
     }
 }
 
-fn get_monitors_wmi(_monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<String, OsString>) {
+fn get_monitors_wmi(_monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<OsString, OsString>) {
     debug_assert!(monitor_ids.is_empty(), "WMI support is not implemented yet");
 }
 
@@ -298,12 +297,12 @@ impl Monitor {
         query_wmi(&query)
     }
 
-    fn get_user_friendly_name_inner(&self) -> Result<Option<OsString>> {
+    pub fn get_user_friendly_name(&self) -> Result<Option<OsString>> {
         let Some(instance) = self.get_wmi_instance("WmiMonitorID")? else {
             return Ok(None);
         };
         let mut variant: mem::MaybeUninit<VARIANT> = mem::MaybeUninit::uninit();
-        let user_friendly_name = PCWSTR::from_raw(L!("UserFriendlyName").as_ptr());
+        let user_friendly_name = PCWSTR::from_raw(L!("UserFriendlyName\0").as_ptr());
         unsafe { instance.Get(user_friendly_name, 0, variant.as_mut_ptr(), None, None) }?;
         let mut variant = unsafe { variant.assume_init() };
         let s = ((unsafe { &variant.Anonymous.Anonymous }.vt.0 & VT_ARRAY.0) != 0)
@@ -328,10 +327,6 @@ impl Monitor {
             .transpose();
         unsafe { VariantClear(&mut variant) }?;
         s
-    }
-
-    pub fn get_user_friendly_name(&self) -> Option<OsString> {
-        self.get_user_friendly_name_inner().ok().flatten()
     }
 }
 
@@ -388,7 +383,9 @@ fn get_wmi_services() -> Result<IWbemServices> {
             Ok(NonZeroUsize::try_from(ptr).unwrap())
         })?
         .get() as *mut c_void;
-    Ok((*mem::ManuallyDrop::new(unsafe { IWbemServices::from_raw(services) })).clone())
+    Ok(unsafe { IWbemServices::from_raw_borrowed(&services) }
+        .unwrap()
+        .clone())
 }
 
 fn query_wmi(query: &[u16]) -> Result<Option<IWbemClassObject>> {
