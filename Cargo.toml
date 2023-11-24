@@ -9,7 +9,15 @@ features = [
     "Win32_Devices_Display",
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_Ole",
+    "Win32_System_Variant",
+    "Win32_System_Wmi",
 ]
+
+[dependencies.once_cell]
+version = "1.18"
 
 [[bin]]
 name = "list-monitors"

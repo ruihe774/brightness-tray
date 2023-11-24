@@ -6,6 +6,7 @@ fn main() {
     let monitors = get_monitors();
     let mut stdout = io::stdout().lock();
     for monitor in monitors {
-        writeln!(stdout, "{monitor:?}").unwrap();
+        let name = monitor.get_user_friendly_name();
+        writeln!(stdout, "{name:?}: {monitor:?}").unwrap();
     }
 }
