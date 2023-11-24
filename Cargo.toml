@@ -1,0 +1,20 @@
+[package]
+name = "monitor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.windows]
+version = "0.52"
+features = [
+    "Win32_Devices_Display",
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+]
+
+[[bin]]
+name = "list-monitors"
+path = "src/bin/list_monitors.rs"
+
+[[bin]]
+name = "monitor-config"
+path = "src/bin/monitor_config.rs"
