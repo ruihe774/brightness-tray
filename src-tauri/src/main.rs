@@ -8,6 +8,7 @@ use monitor::{Feature, Monitor};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::Mutex;
 use tauri::State;
+use uuid::Uuid;
 
 struct Monitors(Mutex<BTreeMap<String, Monitor>>);
 
@@ -112,6 +113,18 @@ async fn set_monitor_feature(
     monitor.set_feature(feature, value).map_err(error_to_string)
 }
 
+#[tauri::command]
+fn uuid4() -> String {
+    let uuid = Uuid::new_v4();
+    uuid.as_hyphenated().to_string()
+}
+
+#[tauri::command]
+fn windows_version() -> [u32; 4] {
+    let ver = windows_version::OsVersion::current();
+    [ver.major, ver.minor, ver.pack, ver.build]
+}
+
 fn main() {
     monitor::init_com().expect("failed to initialize COM");
     tauri::Builder::default()
@@ -122,6 +135,8 @@ fn main() {
             get_monitor_user_friendly_name,
             get_monitor_feature,
             set_monitor_feature,
+            uuid4,
+            windows_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

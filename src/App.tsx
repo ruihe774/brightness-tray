@@ -1,7 +1,10 @@
 import { useCallback, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
+import settings from "./settings";
 
 export default function App() {
+  console.log(settings)
+
   const [monitors, setMonitors] = useState([] as {id: string, name: string | null, maximum: number, current: number}[]);
 
   const refreshHandler = useCallback(() => {
