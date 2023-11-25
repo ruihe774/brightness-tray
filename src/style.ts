@@ -1,6 +1,6 @@
-import { autorun, observable } from "mobx"
 import { css } from "@emotion/css"
 import { invoke } from "@tauri-apps/api/tauri"
+import { autorun, observable } from "mobx"
 
 export let sheet = observable<{ [key: string]: string }>({})
 

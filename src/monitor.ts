@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api"
-import { observable, action, autorun, flow, runInAction } from "mobx"
+import { action, autorun, flow, observable, runInAction } from "mobx"
 import settings from "./settings"
 
 export interface Reply {

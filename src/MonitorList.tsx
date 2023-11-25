@@ -1,9 +1,10 @@
+import { css } from "@emotion/css"
+import classNames from "classnames"
 import { observer } from "mobx-react-lite"
 import React, { useCallback } from "react"
 import monitorManager from "./monitor"
+import settings from "./settings"
 import { makeSliderStyle, sheet } from "./style"
-import classNames from "classnames"
-import { css } from "@emotion/css"
 
 interface MonitorProps {
     monitorId: string
@@ -15,8 +16,21 @@ const MonitorItem = observer(function MonitorItem(props: MonitorProps) {
     const monitor = monitorManager.getMonitor(monitorId)
     const name = monitor.name ?? monitor.id.split("#")[1]
 
+    const handlePowerOff = useCallback(() => {
+        let value = settings.ddcPowerOffValue
+        const feature = monitorManager.getFeature(monitorId, "powerstate")
+        if (feature.value.maximum) {
+            value = Math.max(4, Math.min(value, feature.value.maximum))
+        }
+        monitorManager.setFeature(monitorId, "powerstate", value)
+    }, [monitorId])
+
     const powerButton = monitorManager.hasFeature(monitorId, "powerstate") ? (
-        <button type="button" className={sheet.borderlessButton}>
+        <button
+            type="button"
+            className={sheet.borderlessButton}
+            onClick={handlePowerOff}
+        >
             <span className={sheet.icon} aria-hidden>
                 &#xE7E8;
             </span>
