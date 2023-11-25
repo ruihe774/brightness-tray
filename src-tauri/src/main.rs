@@ -7,12 +7,9 @@ use std::ffi::c_void;
 use std::mem;
 
 use monitor::{Feature, Monitor};
-use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::Mutex;
-use tauri::{Manager, State};
-use windows::core::Result as WinResult;
-use windows::Win32::Foundation::HWND;
+use tauri::{State, Window};
 
 #[derive(Debug)]
 struct Monitors(Mutex<BTreeMap<String, Monitor>>);
@@ -164,8 +161,9 @@ fn get_accent_colors() -> JSResult<AccentColors> {
     })
 }
 
-fn enable_mica(hwnd: HWND) -> WinResult<()> {
-    use windows::Win32::Foundation::BOOL;
+fn enable_mica(window: &Window) -> windows::core::Result<()> {
+    use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+    use windows::Win32::Foundation::{BOOL, HWND};
     use windows::Win32::Graphics::Dwm::{
         DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMSBT_MAINWINDOW,
         DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE, DWM_SYSTEMBACKDROP_TYPE,
@@ -174,6 +172,12 @@ fn enable_mica(hwnd: HWND) -> WinResult<()> {
     use windows::Win32::UI::WindowsAndMessaging::{
         GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_SYSMENU,
     };
+
+    let handle = window.raw_window_handle();
+    let RawWindowHandle::Win32(handle) = handle else {
+        panic!("failed to get HWND");
+    };
+    let hwnd = HWND(handle.hwnd as isize);
 
     let mut style = unsafe { GetWindowLongW(hwnd, GWL_STYLE) } as u32;
     style &= !WS_SYSMENU.0;
@@ -209,7 +213,49 @@ fn enable_mica(hwnd: HWND) -> WinResult<()> {
     Ok(())
 }
 
+fn locate_panel(window: &Window, pos: &tauri::PhysicalPosition<f64>) {
+    use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+    use windows::Win32::Foundation::{HWND, POINT, RECT};
+    use windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTOPRIMARY,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
+
+    let handle = window.raw_window_handle();
+    let RawWindowHandle::Win32(handle) = handle else {
+        panic!("failed to get HWND");
+    };
+    let hwnd = HWND(handle.hwnd as isize);
+
+    let hmonitor = unsafe {
+        MonitorFromPoint(
+            POINT {
+                x: pos.x as i32,
+                y: pos.y as i32,
+            },
+            MONITOR_DEFAULTTOPRIMARY,
+        )
+    };
+    let mut info = MONITORINFO::default();
+    info.cbSize = mem::size_of::<MONITORINFO>() as u32;
+    unsafe { GetMonitorInfoW(hmonitor, &mut info) };
+    let mrect = info.rcWork;
+
+    let mut wrect = RECT::default();
+    unsafe { GetWindowRect(hwnd, &mut wrect) }.unwrap();
+    let w = wrect.right - wrect.left;
+    let h = wrect.bottom - wrect.top;
+    let x = mrect.right - w - 16;
+    let y = mrect.bottom - h - 16;
+
+    window
+        .set_position(tauri::PhysicalPosition { x, y })
+        .unwrap()
+}
+
 fn main() {
+    use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
+
     monitor::init_com().expect("failed to initialize COM");
     tauri::Builder::default()
         .manage(Monitors::new())
@@ -223,14 +269,25 @@ fn main() {
         ])
         .setup(|app| {
             for (_, window) in app.windows() {
-                let handle = window.raw_window_handle();
-                let RawWindowHandle::Win32(handle) = handle else {
-                    panic!("failed to get HWND");
-                };
-                let hwnd = HWND(handle.hwnd as isize);
-                enable_mica(hwnd)?;
+                enable_mica(&window)?;
             }
             Ok(())
+        })
+        .system_tray(SystemTray::new().with_menu(
+            SystemTrayMenu::new().add_item(CustomMenuItem::new("quit".to_owned(), "Quit")),
+        ))
+        .on_system_tray_event(|app, event| match event {
+            SystemTrayEvent::LeftClick { position, .. } => {
+                let window = app.get_window("panel").unwrap();
+                locate_panel(&window, &position);
+                window.show().unwrap();
+                enable_mica(&window).unwrap();
+                window.set_focus().unwrap();
+            }
+            SystemTrayEvent::MenuItemClick { id, .. } if id == "quit" => {
+                app.exit(0);
+            }
+            _ => (),
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

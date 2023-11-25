@@ -11,18 +11,21 @@
   },
   "tauri": {
     "allowlist": {
-      "all": false
+      "window": {
+        "setSize": true,
+        "hide": true
+      }
+    },
+    "systemTray": {
+      "iconPath": "icons/dark.ico"
     },
     "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.tauri.dev",
+      "identifier": "io.misakikasumi.brightness-tray",
+      "publisher": "Misaki Kasumi",
+      "shortDescription": "Manage the brightness of monitors from your system tray",
+      "category": "Utility",
       "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
+        "icons/light.ico"
       ]
     },
     "security": {
@@ -32,7 +35,14 @@
       {
         "label": "panel",
         "decorations": false,
-        "transparent": true
+        "transparent": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "alwaysOnTop": true,
+        "width": 350,
+        "height": 1000,
+        "visible": false,
+        "focus": false
       }
     ]
   }

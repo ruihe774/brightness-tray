@@ -5,7 +5,8 @@
 }
 
 body {
-    margin: 1rem;
+    margin: 1.2rem 1rem;
+    overflow: hidden;
 }
 
 @media screen and (prefers-color-scheme: dark) {
