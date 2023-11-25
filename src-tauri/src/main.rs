@@ -10,6 +10,7 @@ use tauri::async_runtime::Mutex;
 use tauri::State;
 use uuid::Uuid;
 
+#[derive(Debug)]
 struct Monitors(Mutex<BTreeMap<String, Monitor>>);
 
 impl Monitors {
@@ -119,10 +120,18 @@ fn uuid4() -> String {
     uuid.as_hyphenated().to_string()
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+struct OsVersion {
+    pub major: u32,
+    pub minor: u32,
+    pub pack: u32,
+    pub build: u32,
+}
+
 #[tauri::command]
-fn windows_version() -> [u32; 4] {
+fn windows_version() -> OsVersion {
     let ver = windows_version::OsVersion::current();
-    [ver.major, ver.minor, ver.pack, ver.build]
+    OsVersion { major: ver.major, minor: ver.minor, pack: ver.pack, build: ver.build }
 }
 
 fn main() {

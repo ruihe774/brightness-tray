@@ -1,0 +1,4 @@
+semi: false
+quoteProps: consistent
+arrowParens: avoid
+tabWidth: 4

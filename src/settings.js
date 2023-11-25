@@ -1,10 +1,9 @@
-import * as app from '@tauri-apps/api/app';
-import { invoke } from "@tauri-apps/api/tauri";
+import * as app from "@tauri-apps/api/app"
+import { invoke } from "@tauri-apps/api/tauri"
 
-const isDev = false;
-const uuid = await invoke("uuid4");
-console.log(await invoke("windows_version"));
-const isWin11 = (await invoke("windows_version"))[3] >= 22000;
+const isDev = false
+const uuid = await invoke("uuid4")
+const isWin11 = (await invoke("windows_version")).build >= 22000
 
 export default {
     isDev,
@@ -27,9 +26,9 @@ export default {
     monitorFeatures: {},
     hideDisplays: {},
     checkForUpdates: !isDev,
-    dismissedUpdate: '',
+    dismissedUpdate: "",
     language: "system",
-    settingsVer: "v" + await app.getVersion(),
+    settingsVer: "v" + (await app.getVersion()),
     names: {},
     analytics: !isDev,
     scrollShortcut: true,
@@ -60,5 +59,5 @@ export default {
     disableAutoRefresh: false,
     disableAutoApply: false,
     uuid,
-    branch: "master"
-  };
+    branch: "master",
+}

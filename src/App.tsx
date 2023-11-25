@@ -1,49 +1,67 @@
-import { useCallback, useState } from "react";
-import { invoke } from "@tauri-apps/api/tauri";
-import settings from "./settings";
+import { useCallback } from "react"
+import { observer } from "mobx-react-lite"
+import monitorManager from "./monitor"
 
-export default function App() {
-  console.log(settings)
+export default observer(function App() {
+    const { monitors } = monitorManager
 
-  const [monitors, setMonitors] = useState([] as {id: string, name: string | null, maximum: number, current: number}[]);
+    const refreshHandler = useCallback(() => {
+        monitorManager.refreshMonitors()
+    }, [])
 
-  const refreshHandler = useCallback(() => {
-    invoke("refresh_monitors");
-  }, [])
+    const changeHandle = useCallback(
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+            const {
+                value,
+                dataset: { monitor: id, feature: name },
+            } = e.target
+            monitorManager.setFeature(id!, name!, Number(value))
+        },
+        [],
+    )
 
-  const listHandler = useCallback(async () => {
-    const ids: string[] = await invoke("get_monitors");
-    const monitors = [];
-    for (const id of ids) {
-      let name: string | null = await invoke("get_monitor_user_friendly_name", {id});
-      let reply: {current: number, maximum: number} = await invoke("get_monitor_feature", {id, feature: "luminance"})
-      monitors.push({id, name, ...reply});
-    }
-    setMonitors(monitors);
-  }, [])
-
-  const changeHandle = useCallback(async (e: React.FormEvent) => {
-    const target = e.target as HTMLInputElement;
-    const id = target.dataset.monitorId;
-    const value = Number(target.value);
-    await invoke("set_monitor_feature", {id, feature: "luminance", value});
-    await listHandler()
-  }, []);
-
-  return (
-    <div className="container">
-      <button type="button" onClick={refreshHandler}>Refresh</button>
-      <button type="button" onClick={listHandler}>List</button>
-      <ul>
-        {monitors.map(monitor => (
-          <li key={monitor.id}>
-            <div><b>{monitor.name}</b>: <code>{monitor.id}</code></div>
-            <div>
-              <input type="range" min="0" max={monitor.maximum} value={monitor.current} onChange={changeHandle} data-monitor-id={monitor.id} />
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-};
+    return (
+        <div className="container">
+            <button type="button" onClick={refreshHandler}>
+                Refresh
+            </button>
+            <ul>
+                {monitors.map(monitor => (
+                    <li key={monitor.id}>
+                        <b>{monitor.name}</b>: <code>{monitor.id}</code>
+                        <table>
+                            {monitor.features
+                                .filter(({ value }) => value.maximum)
+                                .map(({ name, value }) => (
+                                    <label
+                                        key={name}
+                                        style={{
+                                            display: "table-row",
+                                            verticalAlign: "middle",
+                                        }}
+                                    >
+                                        <td>{name}</td>
+                                        <td>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max={value.maximum}
+                                                step="1"
+                                                value={value.current}
+                                                data-monitor={monitor.id}
+                                                data-feature={name}
+                                                onChange={changeHandle}
+                                            />
+                                        </td>
+                                        <td>
+                                            <output>{value.current}</output>
+                                        </td>
+                                    </label>
+                                ))}
+                        </table>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    )
+})
