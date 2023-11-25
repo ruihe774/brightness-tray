@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api"
-import { observable, action, autorun, comparer, flow } from "mobx"
+import { observable, action, autorun, flow, runInAction } from "mobx"
 import settings from "./settings"
 
 export interface Reply {
@@ -69,7 +69,9 @@ export class Manager {
                 for (const monitor of this.monitors) {
                     for (const feature of monitor.features) {
                         if (feature.syncing) {
-                            feature.syncing = false
+                            runInAction(() => {
+                                feature.syncing = false
+                            })
                             invoke("set_monitor_feature", {
                                 id: monitor.id,
                                 feature: feature.name,
@@ -133,6 +135,15 @@ export class Manager {
         throw new Error(`no such monitor: '${id}'`)
     }
 
+    hasMonitor(id: string): boolean {
+        try {
+            this.getMonitor(id)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     @flow
     *refreshFeature(
         id: string,
@@ -156,6 +167,15 @@ export class Manager {
             return feature
         }
         throw new Error(`monitor '${id}' has no such feature: '${name}'`)
+    }
+
+    hasFeature(id: string, name: string): boolean {
+        try {
+            this.getFeature(id, name)
+            return true
+        } catch {
+            return false
+        }
     }
 
     @action
