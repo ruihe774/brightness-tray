@@ -114,13 +114,14 @@ autorun(() => {
 
     const bigIcon = css`
         ${icon};
+        font-weight: 300;
         transform: scale(1.6) translateY(0.12em);
         width: 1.6em;
         margin: 0 0.6em;
     `
 
     const cozyLine = css`
-        line-height: 2;
+        line-height: 2.2;
     `
 
     const grow = css`
@@ -193,7 +194,6 @@ export function makeSliderStyle(value: number) {
             );
             height: 0.3rem;
             border-radius: 0.6rem;
-            transform: translateY(0.15rem);
         }
     `
 }

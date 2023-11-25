@@ -160,6 +160,16 @@ const FeatureSlider = observer(function FeatureSlider(
                 onChange={handleChange}
                 className={classNames(sheet.grow, makeSliderStyle(current))}
             />
+            <output
+                className={css`
+                    ${sheet.titleFont};
+                    width: 3ch;
+                    text-align: center;
+                    margin-left: 2ch;
+                `}
+            >
+                {current}
+            </output>
         </label>
     )
 })

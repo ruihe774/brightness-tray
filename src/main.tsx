@@ -46,3 +46,5 @@ await appWindow.onFocusChanged(({ payload: focused }) => {
         appWindow.hide()
     }
 })
+
+document.addEventListener("contextmenu", e => e.preventDefault())
