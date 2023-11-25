@@ -10,7 +10,9 @@
     "fmt": "prettier -w src"
   },
   "dependencies": {
+    "@emotion/css": "^11.11.0",
     "@tauri-apps/api": "^1.5.0",
+    "classnames": "^2.3.0",
     "mobx": "^6.11.0",
     "mobx-react-lite": "^4.0.0",
     "react": "^18.0.0",
@@ -18,6 +20,7 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-decorators": "^7.23.0",
+    "@emotion/babel-plugin": "^11.11.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "@vitejs/plugin-react": "^4.0.0",

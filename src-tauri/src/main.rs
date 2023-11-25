@@ -122,16 +122,67 @@ fn uuid4() -> String {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 struct OsVersion {
-    pub major: u32,
-    pub minor: u32,
-    pub pack: u32,
-    pub build: u32,
+    major: u32,
+    minor: u32,
+    pack: u32,
+    build: u32,
 }
 
 #[tauri::command]
 fn windows_version() -> OsVersion {
     let ver = windows_version::OsVersion::current();
-    OsVersion { major: ver.major, minor: ver.minor, pack: ver.pack, build: ver.build }
+    OsVersion {
+        major: ver.major,
+        minor: ver.minor,
+        pack: ver.pack,
+        build: ver.build,
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct Color {
+    r: u8,
+    g: u8,
+    b: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(non_snake_case)]
+struct AccentColors {
+    accent: Color,
+    accentDark1: Color,
+    accentDark2: Color,
+    accentDark3: Color,
+    accentLight1: Color,
+    accentLight2: Color,
+    accentLight3: Color,
+    background: Color,
+    foreground: Color,
+}
+
+#[tauri::command]
+fn get_accent_colors() -> JSResult<AccentColors> {
+    use windows::UI;
+    use windows::UI::ViewManagement::{UIColorType, UISettings};
+
+    let settings = UISettings::new().map_err(error_to_string)?;
+
+    let get_color = |color_type| match settings.GetColorValue(color_type) {
+        Ok(UI::Color { R, G, B, .. }) => Ok(Color { r: R, g: G, b: B }),
+        Err(e) => Err(error_to_string(e)),
+    };
+
+    Ok(AccentColors {
+        accent: get_color(UIColorType::Accent)?,
+        accentDark1: get_color(UIColorType::AccentDark1)?,
+        accentDark2: get_color(UIColorType::AccentDark2)?,
+        accentDark3: get_color(UIColorType::AccentDark3)?,
+        accentLight1: get_color(UIColorType::AccentLight1)?,
+        accentLight2: get_color(UIColorType::AccentLight2)?,
+        accentLight3: get_color(UIColorType::AccentLight3)?,
+        background: get_color(UIColorType::Background)?,
+        foreground: get_color(UIColorType::Foreground)?,
+    })
 }
 
 fn main() {
@@ -146,6 +197,7 @@ fn main() {
             set_monitor_feature,
             uuid4,
             windows_version,
+            get_accent_colors,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
