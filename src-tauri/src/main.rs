@@ -11,7 +11,6 @@ use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::Mutex;
 use tauri::{Manager, State};
-use uuid::Uuid;
 use windows::core::Result as WinResult;
 use windows::Win32::Foundation::HWND;
 
@@ -119,31 +118,6 @@ async fn set_monitor_feature(
     monitor.set_feature(feature, value).map_err(error_to_string)
 }
 
-#[tauri::command]
-fn uuid4() -> String {
-    let uuid = Uuid::new_v4();
-    uuid.as_hyphenated().to_string()
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-struct OsVersion {
-    major: u32,
-    minor: u32,
-    pack: u32,
-    build: u32,
-}
-
-#[tauri::command]
-fn windows_version() -> OsVersion {
-    let ver = windows_version::OsVersion::current();
-    OsVersion {
-        major: ver.major,
-        minor: ver.minor,
-        pack: ver.pack,
-        build: ver.build,
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Color {
     r: u8,
@@ -193,22 +167,29 @@ fn get_accent_colors() -> JSResult<AccentColors> {
 fn enable_mica(hwnd: HWND) -> WinResult<()> {
     use windows::Win32::Foundation::BOOL;
     use windows::Win32::Graphics::Dwm::{
-        DwmSetWindowAttribute, DwmExtendFrameIntoClientArea, DWMSBT_MAINWINDOW, DWMWA_SYSTEMBACKDROP_TYPE,
-        DWMWA_USE_IMMERSIVE_DARK_MODE, DWM_SYSTEMBACKDROP_TYPE,
+        DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMSBT_MAINWINDOW,
+        DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE, DWM_SYSTEMBACKDROP_TYPE,
     };
     use windows::Win32::UI::Controls::MARGINS;
-    use windows::Win32::UI::WindowsAndMessaging::{SetWindowLongW, GetWindowLongW, GWL_STYLE, WS_SYSMENU};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_SYSMENU,
+    };
 
     let mut style = unsafe { GetWindowLongW(hwnd, GWL_STYLE) } as u32;
     style &= !WS_SYSMENU.0;
     unsafe { SetWindowLongW(hwnd, GWL_STYLE, style as i32) };
 
-    unsafe { DwmExtendFrameIntoClientArea(hwnd, &MARGINS{
-        cxLeftWidth: -1,
-        cxRightWidth: -1,
-        cyBottomHeight: -1,
-        cyTopHeight: -1
-    } as *const MARGINS) }?;
+    unsafe {
+        DwmExtendFrameIntoClientArea(
+            hwnd,
+            &MARGINS {
+                cxLeftWidth: -1,
+                cxRightWidth: -1,
+                cyBottomHeight: -1,
+                cyTopHeight: -1,
+            } as *const MARGINS,
+        )
+    }?;
     unsafe {
         DwmSetWindowAttribute(
             hwnd,
@@ -238,8 +219,6 @@ fn main() {
             get_monitor_user_friendly_name,
             get_monitor_feature,
             set_monitor_feature,
-            uuid4,
-            windows_version,
             get_accent_colors,
         ])
         .setup(|app| {
