@@ -1,5 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(debug_assertions, allow(unreachable_code))]
+#![cfg_attr(debug_assertions, allow(unused_imports))]
 
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
@@ -253,9 +255,75 @@ fn locate_panel(window: &Window, pos: &tauri::PhysicalPosition<f64>) {
         .unwrap()
 }
 
+fn hook_panic() {
+    use windows::core::PCWSTR;
+    use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
+    #[cfg(not(debug_assertions))]
+    std::panic::set_hook(Box::new(|info| {
+        let text = format!("The program {info}\0");
+        let wtext: Vec<_> = text.encode_utf16().collect();
+        let caption = "Brightness Tray\0";
+        let wcaption: Vec<_> = caption.encode_utf16().collect();
+        unsafe {
+            MessageBoxW(
+                None,
+                PCWSTR::from_raw(wtext.as_ptr()),
+                PCWSTR::from_raw(wcaption.as_ptr()),
+                MB_ICONERROR,
+            )
+        };
+    }));
+}
+
+fn ensure_singleton() {
+    use std::env;
+    use std::fs::OpenOptions;
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::process::exit;
+    use windows::core::PCSTR;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        MessageBoxA, IDABORT, IDIGNORE, IDRETRY, MB_ABORTRETRYIGNORE, MB_ICONWARNING,
+    };
+
+    let mut lock_file = env::temp_dir();
+    lock_file.push("BrightnessTray.lock");
+    mem::forget(
+        match OpenOptions::new()
+            .write(true)
+            .create(true)
+            .share_mode(0)
+            .open(lock_file)
+        {
+            Ok(f) => f,
+            Err(e) if e.raw_os_error() == Some(32) => {
+                #[cfg(debug_assertions)]
+                panic!("another instance is running");
+                let text = b"Another instance is running.\0";
+                let caption = b"Brightness Tray\0";
+                let r = unsafe {
+                    MessageBoxA(
+                        None,
+                        PCSTR::from_raw(text.as_ptr()),
+                        PCSTR::from_raw(caption.as_ptr()),
+                        MB_ABORTRETRYIGNORE | MB_ICONWARNING,
+                    )
+                };
+                return match r {
+                    IDABORT => exit(0),
+                    IDRETRY => ensure_singleton(),
+                    IDIGNORE => (),
+                    _ => unreachable!(),
+                };
+            }
+            r @ Err(_) => r.expect("failed to create singleton lock"),
+        },
+    )
+}
+
 fn main() {
     use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
-
+    hook_panic();
+    ensure_singleton();
     monitor::init_com().expect("failed to initialize COM");
     tauri::Builder::default()
         .manage(Monitors::new())
