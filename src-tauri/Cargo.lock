@@ -151,6 +151,7 @@ name = "brightness-tray"
 version = "0.1.0"
 dependencies = [
  "monitor",
+ "raw-window-handle",
  "serde",
  "tauri",
  "tauri-build",

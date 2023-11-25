@@ -160,6 +160,7 @@ export function makeSliderStyle(value: number) {
         }
 
         -webkit-appearance: none;
+        background: none;
         &::-webkit-slider-thumb {
             -webkit-appearance: none;
             box-sizing: content-box;

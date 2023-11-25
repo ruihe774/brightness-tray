@@ -30,11 +30,9 @@
     },
     "windows": [
       {
-        "fullscreen": false,
-        "resizable": true,
-        "title": "brightness-tray",
-        "width": 800,
-        "height": 600
+        "label": "panel",
+        "decorations": false,
+        "transparent": true
       }
     ]
   }

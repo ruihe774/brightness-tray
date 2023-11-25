@@ -1,8 +1,15 @@
 :root {
     font-family: "Segoe UI Variable Text", "Segoe UI";
     font-size: 14px;
+    color: black;
 }
 
 body {
     margin: 1rem;
+}
+
+@media screen and (prefers-color-scheme: dark) {
+    :root {
+        color: white;
+    }
 }

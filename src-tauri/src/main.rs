@@ -3,12 +3,17 @@
 
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
+use std::ffi::c_void;
+use std::mem;
 
 use monitor::{Feature, Monitor};
+use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::Mutex;
-use tauri::State;
+use tauri::{Manager, State};
 use uuid::Uuid;
+use windows::core::Result as WinResult;
+use windows::Win32::Foundation::HWND;
 
 #[derive(Debug)]
 struct Monitors(Mutex<BTreeMap<String, Monitor>>);
@@ -185,6 +190,44 @@ fn get_accent_colors() -> JSResult<AccentColors> {
     })
 }
 
+fn enable_mica(hwnd: HWND) -> WinResult<()> {
+    use windows::Win32::Foundation::BOOL;
+    use windows::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DwmExtendFrameIntoClientArea, DWMSBT_MAINWINDOW, DWMWA_SYSTEMBACKDROP_TYPE,
+        DWMWA_USE_IMMERSIVE_DARK_MODE, DWM_SYSTEMBACKDROP_TYPE,
+    };
+    use windows::Win32::UI::Controls::MARGINS;
+    use windows::Win32::UI::WindowsAndMessaging::{SetWindowLongW, GetWindowLongW, GWL_STYLE, WS_SYSMENU};
+
+    let mut style = unsafe { GetWindowLongW(hwnd, GWL_STYLE) } as u32;
+    style &= !WS_SYSMENU.0;
+    unsafe { SetWindowLongW(hwnd, GWL_STYLE, style as i32) };
+
+    unsafe { DwmExtendFrameIntoClientArea(hwnd, &MARGINS{
+        cxLeftWidth: -1,
+        cxRightWidth: -1,
+        cyBottomHeight: -1,
+        cyTopHeight: -1
+    } as *const MARGINS) }?;
+    unsafe {
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            &BOOL(1) as *const BOOL as *const c_void,
+            mem::size_of::<BOOL>() as u32,
+        )
+    }?;
+    unsafe {
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_SYSTEMBACKDROP_TYPE,
+            &DWMSBT_MAINWINDOW as *const DWM_SYSTEMBACKDROP_TYPE as *const c_void,
+            mem::size_of::<DWM_SYSTEMBACKDROP_TYPE>() as u32,
+        )
+    }?;
+    Ok(())
+}
+
 fn main() {
     monitor::init_com().expect("failed to initialize COM");
     tauri::Builder::default()
@@ -199,6 +242,17 @@ fn main() {
             windows_version,
             get_accent_colors,
         ])
+        .setup(|app| {
+            for (_, window) in app.windows() {
+                let handle = window.raw_window_handle();
+                let RawWindowHandle::Win32(handle) = handle else {
+                    panic!("failed to get HWND");
+                };
+                let hwnd = HWND(handle.hwnd as isize);
+                enable_mica(hwnd)?;
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
