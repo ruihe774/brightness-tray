@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api"
-import { observable, action } from "mobx"
+import { observable, action, autorun, comparer, flow } from "mobx"
+import settings from "./settings"
 
 export interface Reply {
     current: number
@@ -9,6 +10,7 @@ export interface Reply {
 export interface Feature {
     name: string
     value: Reply
+    syncing: boolean
 }
 
 export interface Monitor {
@@ -51,7 +53,7 @@ async function getFeatures(
                 feature: name,
             })
         }
-        features.push({ name, value })
+        features.push({ name, value, syncing: false })
     }
     return features
 }
@@ -61,25 +63,44 @@ export class Manager {
 
     constructor() {
         this.monitors = []
+
+        autorun(
+            () => {
+                for (const monitor of this.monitors) {
+                    for (const feature of monitor.features) {
+                        if (feature.syncing) {
+                            feature.syncing = false
+                            invoke("set_monitor_feature", {
+                                id: monitor.id,
+                                feature: feature.name,
+                                value: feature.value.current,
+                            }).catch(() => {
+                                this.refreshFeature(monitor.id, feature.name)
+                            })
+                        }
+                    }
+                }
+            },
+            {
+                delay: settings.updateInterval,
+            },
+        )
     }
 
-    @action
-    async refreshMonitors() {
-        await invoke("refresh_monitors")
-        const monitor_ids = await invoke<string[]>("get_monitors")
-        const monitor_names = await Promise.all(
+    @flow
+    *refreshMonitors(): Generator<Promise<any>, void, any> {
+        yield invoke("refresh_monitors")
+        const monitor_ids: string[] = yield invoke("get_monitors")
+        const monitor_names: (string | null)[] = yield Promise.all(
             monitor_ids.map(id => {
                 try {
-                    return invoke<string | null>(
-                        "get_monitor_user_friendly_name",
-                        { id },
-                    )
+                    return invoke("get_monitor_user_friendly_name", { id })
                 } catch {
                     return null
                 }
             }),
         )
-        const monitor_features = await Promise.all(
+        const monitor_features: Feature[][] = yield Promise.all(
             monitor_ids.map(id =>
                 getFeatures(
                     id,
@@ -112,10 +133,14 @@ export class Manager {
         throw new Error(`no such monitor: '${id}'`)
     }
 
-    @action
-    async refreshFeature(id: string, name: string) {
+    @flow
+    *refreshFeature(
+        id: string,
+        name: string,
+    ): Generator<Promise<any>, void, any> {
         const monitor = this.getMonitor(id)
-        const feature = (await getFeatures(id, [name]))[0]
+        const features: Feature[] = yield getFeatures(id, [name])
+        const feature = features[0]
         const idx = monitor.features.findIndex(f => f.name == feature.name)
         if (idx == -1) {
             monitor.features.push(feature)
@@ -134,15 +159,10 @@ export class Manager {
     }
 
     @action
-    async setFeature(id: string, name: string, value: number) {
-        const monitor = this.getMonitor(id)
-        await invoke("set_monitor_feature", { id, feature: name, value })
-        const idx = monitor.features.findIndex(f => f.name == name)
-        if (idx == -1) {
-            this.refreshFeature(id, name)
-        } else {
-            monitor.features[idx].value.current = value
-        }
+    setFeature(id: string, name: string, value: number) {
+        const feature = this.getFeature(id, name)
+        feature.value.current = value
+        feature.syncing = true
     }
 }
 
