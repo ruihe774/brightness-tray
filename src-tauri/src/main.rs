@@ -198,7 +198,7 @@ fn enable_mica(window: &Window) -> windows::core::Result<()> {
         DwmSetWindowAttribute(
             hwnd,
             DWMWA_USE_IMMERSIVE_DARK_MODE,
-            &BOOL(1) as *const BOOL as *const c_void,
+            &(window.theme().unwrap() == tauri::Theme::Dark).into() as *const BOOL as *const c_void,
             mem::size_of::<BOOL>() as u32,
         )
     }?;
