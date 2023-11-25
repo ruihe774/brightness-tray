@@ -1,53 +1,46 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
+import { useCallback, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
-import "./App.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+export default function App() {
+  const [monitors, setMonitors] = useState([] as {id: string, name: string | null, maximum: number, current: number}[]);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const refreshHandler = useCallback(() => {
+    invoke("refresh_monitors");
+  }, [])
+
+  const listHandler = useCallback(async () => {
+    const ids: string[] = await invoke("get_monitors");
+    const monitors = [];
+    for (const id of ids) {
+      let name: string | null = await invoke("get_monitor_user_friendly_name", {id});
+      let reply: {current: number, maximum: number} = await invoke("get_monitor_feature", {id, feature: "luminance"})
+      monitors.push({id, name, ...reply});
+    }
+    setMonitors(monitors);
+  }, [])
+
+  const changeHandle = useCallback(async (e: React.FormEvent) => {
+    const target = e.target as HTMLInputElement;
+    const id = target.dataset.monitorId;
+    const value = Number(target.value);
+    await invoke("set_monitor_feature", {id, feature: "luminance", value});
+    await listHandler()
+  }, []);
 
   return (
     <div className="container">
-      <h1>Welcome to Tauri!</h1>
-
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-
-      <p>{greetMsg}</p>
+      <button type="button" onClick={refreshHandler}>Refresh</button>
+      <button type="button" onClick={listHandler}>List</button>
+      <ul>
+        {monitors.map(monitor => (
+          <li key={monitor.id}>
+            <div><b>{monitor.name}</b>: <code>{monitor.id}</code></div>
+            <div>
+              <input type="range" min="0" max={monitor.maximum} value={monitor.current} onChange={changeHandle} data-monitor-id={monitor.id} />
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
-}
-
-export default App;
+};

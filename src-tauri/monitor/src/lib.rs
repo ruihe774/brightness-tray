@@ -15,16 +15,13 @@ use windows::Win32::Devices::Display::{
     GetPhysicalMonitorsFromHMONITOR, GetVCPFeatureAndVCPFeatureReply, SetVCPFeature,
     PHYSICAL_MONITOR,
 };
-use windows::Win32::Foundation::{BOOL, HANDLE, LPARAM, RECT, RPC_E_TOO_LATE, S_FALSE};
+use windows::Win32::Foundation::{BOOL, HANDLE, LPARAM, RECT};
 use windows::Win32::Graphics::Gdi::{
     EnumDisplayDevicesW, EnumDisplayMonitors, GetMonitorInfoW, DISPLAY_DEVICEW,
     DISPLAY_DEVICE_ATTACHED_TO_DESKTOP, DISPLAY_DEVICE_MIRRORING_DRIVER, HDC, HMONITOR,
     MONITORINFOEXW,
 };
-use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CoInitializeSecurity, CLSCTX_INPROC_SERVER,
-    COINIT_MULTITHREADED, EOAC_NONE, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE,
-};
+use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::System::Ole::{
     SafeArrayAccessData, SafeArrayGetLBound, SafeArrayGetUBound, SafeArrayUnaccessData,
 };
@@ -191,8 +188,8 @@ pub fn get_monitors() -> Vec<Monitor> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Reply {
-    current: u32,
-    maximum: u32,
+    pub current: u32,
+    pub maximum: u32,
 }
 
 fn get_vcp(handle: HANDLE, code: u8) -> Result<Reply> {
@@ -330,13 +327,14 @@ impl Monitor {
     }
 }
 
-fn init_com() -> Result<()> {
-    match unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) } {
-        Ok(()) => (),
-        Err(e) if e.code() == S_FALSE => (),
-        Err(e) => return Err(e),
-    }
-    match unsafe {
+#[doc(hidden)]
+pub fn init_com() -> Result<()> {
+    use windows::Win32::System::Com::{
+        CoInitializeSecurity, EOAC_NONE, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE,
+    };
+    use windows::Win32::System::Ole::OleInitialize;
+    unsafe { OleInitialize(None) }?;
+    unsafe {
         CoInitializeSecurity(
             None,
             -1,
@@ -348,13 +346,9 @@ fn init_com() -> Result<()> {
             EOAC_NONE,
             None,
         )
-    } {
-        Ok(()) => Ok(()),
-        Err(e) if e.code() == RPC_E_TOO_LATE => Ok(()),
-        Err(e) => Err(e),
-    }
+    }?;
+    Ok(())
 }
-
 static WMI_SERVICES: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
 fn create_wmi_services() -> Result<IWbemServices> {
@@ -377,7 +371,6 @@ fn create_wmi_services() -> Result<IWbemServices> {
 fn get_wmi_services() -> Result<IWbemServices> {
     let services = WMI_SERVICES
         .get_or_try_init(|| -> Result<NonZeroUsize> {
-            init_com()?;
             let services = create_wmi_services()?;
             let ptr = services.into_raw() as usize;
             Ok(NonZeroUsize::try_from(ptr).unwrap())

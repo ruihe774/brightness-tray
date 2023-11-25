@@ -1,7 +1,9 @@
-use monitor::{get_monitors, Feature};
 use std::env;
 
+use monitor::{get_monitors, init_com, Feature};
+
 fn main() {
+    init_com().unwrap();
     let mut args = env::args_os();
     let id = args.nth(1).expect("expected monitor id");
     let feature_name = args.next().expect("expected feature name");

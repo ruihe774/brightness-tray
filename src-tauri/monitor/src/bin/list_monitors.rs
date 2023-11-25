@@ -1,8 +1,9 @@
 use std::io::{self, Write};
 
-use monitor::get_monitors;
+use monitor::{get_monitors, init_com};
 
 fn main() {
+    init_com().unwrap();
     let monitors = get_monitors();
     let mut stdout = io::stdout().lock();
     for monitor in monitors {
