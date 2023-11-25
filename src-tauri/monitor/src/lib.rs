@@ -39,7 +39,7 @@ pub struct Monitor {
 
 impl Drop for Monitor {
     fn drop(&mut self) {
-        if !self.handle.is_invalid() {
+        if self.handle.0 != -1 {
             unsafe { DestroyPhysicalMonitor(self.handle) }.unwrap();
         }
     }
@@ -244,14 +244,14 @@ impl Feature {
 
 impl Monitor {
     pub fn get_feature(&self, feature: Feature) -> Result<Reply> {
-        if self.handle.is_invalid() {
+        if self.handle.0 == -1 {
             unimplemented!()
         }
         get_vcp(self.handle, feature.vcp_code())
     }
 
     pub fn set_feature(&self, feature: Feature, value: u32) -> Result<()> {
-        if self.handle.is_invalid() {
+        if self.handle.0 == -1 {
             unimplemented!()
         }
         set_vcp(self.handle, feature.vcp_code(), value)
