@@ -1,8 +1,7 @@
 import { css } from "@emotion/css"
 import { invoke } from "@tauri-apps/api/tauri"
-import { autorun, observable } from "mobx"
-
-export let sheet = observable<{ [key: string]: string }>({})
+import { autorun, observable, runInAction } from "mobx"
+import panelState from "./wm"
 
 export interface Color {
     r: number
@@ -22,132 +21,138 @@ export interface AccentColors {
     foreground: Color
 }
 
-export let colors = observable(await invoke<AccentColors>("get_accent_colors"))
+export const colors = observable(
+    await invoke<AccentColors>("get_accent_colors"),
+)
 
 function colorToCSS(color: Color): string {
     return `rgb(${color.r}, ${color.g}, ${color.b})`
 }
 
-autorun(() => {
-    const icon = css`
-        display: inline-block;
-        font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets";
-        transform: scale(1.1) translateY(0.12em);
-        width: 1.1em;
-        margin: 0 0.4em;
-        text-align: center;
-    `
+export const sheet = observable<{ [key: string]: string }>({})
 
-    const resetSpacing = css`
-        margin: 0;
-        padding: 0;
-    `
+autorun(() =>
+    runInAction(() => {
+        const icon = css`
+            display: inline-block;
+            font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets";
+            transform: scale(1.1) translateY(0.12em);
+            width: 1.1em;
+            margin: 0 0.4em;
+            text-align: center;
+        `
 
-    const resetButton = css`
-        ${resetSpacing};
-        appearance: none;
-        font: inherit;
-        color: inherit;
-        box-sizing: content-box;
-        background: none;
-        border: none;
-    `
+        const resetSpacing = css`
+            margin: 0;
+            padding: 0;
+        `
 
-    const borderlessButton = css`
-        ${resetButton};
-        cursor: pointer;
-        opacity: 0.7;
+        const resetButton = css`
+            ${resetSpacing};
+            appearance: none;
+            font: inherit;
+            color: inherit;
+            box-sizing: content-box;
+            background: none;
+            border: none;
+        `
 
-        &:hover {
-            opacity: 1;
-        }
-    `
+        const borderlessButton = css`
+            ${resetButton};
+            cursor: pointer;
+            opacity: 0.7;
 
-    const block = css`
-        display: block;
-    `
+            &:hover {
+                opacity: 1;
+            }
+        `
 
-    const flex = css`
-        display: flex;
-        & > * {
-            ${block};
-        }
-    `
+        const block = css`
+            display: block;
+        `
 
-    const horizontalFlex = css`
-        ${flex};
-        flex-direction: row;
-    `
+        const flex = css`
+            display: flex;
+            & > * {
+                ${block};
+            }
+        `
 
-    const verticalFlex = css`
-        ${flex};
-        flex-direction: column;
-    `
+        const horizontalFlex = css`
+            ${flex};
+            flex-direction: row;
+        `
 
-    const spreadContent = css`
-        justify-content: space-between;
-        & > * {
-            flex-grow: 0;
-        }
-    `
+        const verticalFlex = css`
+            ${flex};
+            flex-direction: column;
+        `
 
-    const stretchContent = css`
-        justify-content: stretch;
-    `
+        const spreadContent = css`
+            justify-content: space-between;
+            & > * {
+                flex-grow: 0;
+            }
+        `
 
-    const centerItems = css`
-        align-items: center;
-    `
+        const stretchContent = css`
+            justify-content: stretch;
+        `
 
-    const stretchItems = css`
-        align-items: stretch;
-    `
+        const centerItems = css`
+            align-items: center;
+        `
 
-    const fillWidth = css`
-        width: 100%;
-    `
+        const stretchItems = css`
+            align-items: stretch;
+        `
 
-    const titleFont = css`
-        font-size: 1.1rem;
-        font-variation-settings: "wght" 350;
-    `
+        const fillWidth = css`
+            width: 100%;
+        `
 
-    const bigIcon = css`
-        ${icon};
-        font-weight: 300;
-        transform: scale(1.6) translateY(0.12em);
-        width: 1.6em;
-        margin: 0 0.6em;
-    `
+        const titleFont = css`
+            font-size: 1.1rem;
+            font-variation-settings: "wght" 350;
+        `
 
-    const cozyLine = css`
-        line-height: 2.2;
-    `
+        const bigIcon = css`
+            ${icon};
+            font-weight: 300;
+            transform: scale(1.6) translateY(0.12em);
+            width: 1.6em;
+            margin: 0 0.6em;
+        `
 
-    const grow = css`
-        flex-grow: 1;
-    `
+        const cozyLine = css`
+            line-height: 2.2;
+        `
 
-    sheet = {
-        icon,
-        resetSpacing,
-        resetButton,
-        borderlessButton,
-        block,
-        flex,
-        horizontalFlex,
-        verticalFlex,
-        spreadContent,
-        stretchContent,
-        centerItems,
-        stretchItems,
-        fillWidth,
-        titleFont,
-        bigIcon,
-        cozyLine,
-        grow,
-    }
-})
+        const grow = css`
+            flex-grow: 1;
+        `
+
+        Object.assign(sheet, {
+            icon,
+            resetSpacing,
+            resetButton,
+            borderlessButton,
+            block,
+            flex,
+            horizontalFlex,
+            verticalFlex,
+            spreadContent,
+            stretchContent,
+            centerItems,
+            stretchItems,
+            fillWidth,
+            titleFont,
+            bigIcon,
+            cozyLine,
+            grow,
+        })
+    }),
+)
 
 export function makeSliderStyle(value: number) {
     return css`
@@ -197,3 +202,18 @@ export function makeSliderStyle(value: number) {
         }
     `
 }
+
+autorun(
+    () => {
+        if (panelState.focused) {
+            invoke<AccentColors>("get_accent_colors").then(newColors =>
+                runInAction(() => {
+                    Object.assign(colors, newColors)
+                }),
+            )
+        }
+    },
+    {
+        delay: 10,
+    },
+)
