@@ -20,13 +20,11 @@ export default defineComponent({
         name() {
             return this.monitor.name ?? this.monitor.id.split("#")[1]
         },
-        powerStateMaximum() {
+        powerState() {
             try {
                 return monitorManager.getFeature(this.monitorId, "powerstate")
-                    .value.maximum
-            } catch {
-                return 0
-            }
+                    .value
+            } catch {}
         },
         css() {
             return css
@@ -40,7 +38,7 @@ export default defineComponent({
             monitorManager.setFeature(
                 this.monitorId,
                 "powerstate",
-                Math.min(settings.ddcPowerOffValue, this.powerStateMaximum),
+                Math.min(settings.ddcPowerOffValue, this.powerState!.maximum),
             )
         },
     },
@@ -82,7 +80,11 @@ export default defineComponent({
                 </span>
             </div>
             <button
-                v-if="powerStateMaximum >= 4"
+                v-if="
+                    powerState &&
+                    powerState.maximum >= 4 &&
+                    powerState.current < 4
+                "
                 type="button"
                 :class="sheet.borderlessButton"
                 @click="handlePowerOff"
