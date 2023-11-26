@@ -138,6 +138,28 @@ const FeatureSlider = observer(function FeatureSlider(
         [monitorId, feature],
     )
 
+    const handleWheel = useCallback(
+        (e: React.WheelEvent<HTMLInputElement>) => {
+            if (e.deltaMode == WheelEvent.DOM_DELTA_PIXEL) {
+                e.preventDefault()
+                const offset =
+                    Math.abs(e.deltaX) > Math.abs(e.deltaY)
+                        ? e.deltaX
+                        : -e.deltaY
+                const current = Number(e.currentTarget.value)
+                monitorManager.setFeature(
+                    monitorId,
+                    feature,
+                    Math.max(
+                        0,
+                        Math.min(maximum, Math.round(current + offset * 0.01)),
+                    ),
+                )
+            }
+        },
+        [monitorId, feature],
+    )
+
     const iconMap: { [key: string]: string } = {
         luminance: "\uE706",
         contrast: "\uE793",
@@ -158,6 +180,7 @@ const FeatureSlider = observer(function FeatureSlider(
                 max={maximum}
                 value={current}
                 onChange={handleChange}
+                onWheel={handleWheel}
                 classList={[sheet.grow, makeSliderStyle(current)]}
             />
             <input
@@ -167,6 +190,7 @@ const FeatureSlider = observer(function FeatureSlider(
                 max={maximum}
                 value={current}
                 onChange={handleChange}
+                onWheel={handleWheel}
                 role="status"
                 classList={[
                     sheet.borderlessNumber,
