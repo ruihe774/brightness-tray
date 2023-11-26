@@ -354,11 +354,23 @@ fn ensure_windows_version() {
 }
 
 fn main() {
-    use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
+    use tauri::{
+        CustomMenuItem, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, Theme,
+        WindowEvent,
+    };
+
     hook_panic();
     ensure_windows_version();
     ensure_singleton();
     monitor::init_com().expect("failed to initialize COM");
+
+    let light_icon: &Icon = Box::leak(Box::new(Icon::Raw(Vec::from(include_bytes!(
+        "../icons/light.ico"
+    )))));
+    let dark_icon: &Icon = Box::leak(Box::new(Icon::Raw(Vec::from(include_bytes!(
+        "../icons/dark.ico"
+    )))));
+
     tauri::Builder::default()
         .manage(Monitors::new())
         .invoke_handler(tauri::generate_handler![
@@ -372,6 +384,11 @@ fn main() {
         .setup(|app| {
             for (_, window) in app.windows() {
                 enable_mica(&window)?;
+            }
+            match app.get_window("panel").unwrap().theme() {
+                Ok(Theme::Light) => app.tray_handle().set_icon(light_icon.clone())?,
+                Ok(Theme::Dark) => app.tray_handle().set_icon(dark_icon.clone())?,
+                _ => (),
             }
             Ok(())
         })
@@ -392,6 +409,20 @@ fn main() {
             }
             SystemTrayEvent::MenuItemClick { id, .. } if id == "quit" => {
                 app.exit(0);
+            }
+            _ => (),
+        })
+        .on_window_event(|e| match e.event() {
+            WindowEvent::ThemeChanged(theme) => {
+                enable_mica(e.window()).unwrap();
+                let app = e.window().app_handle();
+                let tray = app.tray_handle();
+                match theme {
+                    Theme::Light => tray.set_icon(light_icon.clone()),
+                    Theme::Dark => tray.set_icon(dark_icon.clone()),
+                    _ => Ok(()),
+                }
+                .unwrap();
             }
             _ => (),
         })

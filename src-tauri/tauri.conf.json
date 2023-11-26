@@ -17,7 +17,7 @@
       }
     },
     "systemTray": {
-      "iconPath": "icons/dark.ico"
+      "iconPath": "icons/light.ico"
     },
     "bundle": {
       "identifier": "io.misakikasumi.brightness-tray",
@@ -40,7 +40,7 @@
         "skipTaskbar": true,
         "alwaysOnTop": true,
         "width": 350,
-        "height": 1000,
+        "height": 200,
         "visible": false,
         "focus": false
       }
