@@ -1,6 +1,6 @@
 import { LogicalSize, appWindow } from "@tauri-apps/api/window"
 import { reactive } from "vue"
-import { watchDebounced } from "@vueuse/core"
+import { watchThrottled } from "@vueuse/core"
 
 const panelState = reactive({
     width: 0,
@@ -20,25 +20,25 @@ appWindow.onFocusChanged(({ payload }) => {
     panelState.focused = payload
 })
 
-watchDebounced(
+watchThrottled(
     () => ({ width: panelState.width, height: panelState.height }),
     ({ width, height }) => {
         if (width * height > 30000) {
             appWindow.setSize(new LogicalSize(width, height))
         }
     },
-    { debounce: 500 },
+    { throttle: 500 },
 )
 
 if (import.meta.env.PROD) {
-    watchDebounced(
+    watchThrottled(
         () => panelState.focused,
         focused => {
             if (!focused) {
                 appWindow.hide()
             }
         },
-        { debounce: 100 },
+        { throttle: 100 },
     )
 }
 

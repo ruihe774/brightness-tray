@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api"
 import { reactive, watch } from "vue"
-import { watchDebounced } from "@vueuse/core"
+import { watchThrottled } from "@vueuse/core"
 import settings from "./settings"
 
 export interface Reply {
@@ -144,7 +144,7 @@ watch(
     () => settings.updateInterval,
     (updateInterval, _old, onCleanup) => {
         onCleanup(
-            watchDebounced(
+            watchThrottled(
                 monitorManager.monitors,
                 monitors => {
                     for (const monitor of monitors) {
@@ -165,7 +165,7 @@ watch(
                         }
                     }
                 },
-                { debounce: updateInterval },
+                { throttle: updateInterval },
             ),
         )
     },

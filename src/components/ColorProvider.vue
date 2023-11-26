@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { invoke } from "@tauri-apps/api/tauri"
-import { watchDebounced } from "@vueuse/core"
+import { watchThrottled } from "@vueuse/core"
 import { computed, ref } from "vue"
 import panelState from "../wm.js"
 
@@ -24,14 +24,14 @@ interface AccentColors {
 
 const accents = ref<AccentColors>()
 
-watchDebounced(
+watchThrottled(
     () => panelState.focused,
     async focused => {
         if (focused || accents.value == null) {
             accents.value = await invoke<AccentColors>("get_accent_colors")
         }
     },
-    { debounce: 10, immediate: true },
+    { throttle: 10, immediate: true },
 )
 
 const colors = computed(() => {
