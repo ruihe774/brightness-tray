@@ -13,6 +13,12 @@ export default defineComponent({
             required: true,
         },
     },
+    setup() {
+        return {
+            css,
+            sheet,
+        }
+    },
     computed: {
         monitor() {
             return monitorManager.getMonitor(this.monitorId)
@@ -25,12 +31,6 @@ export default defineComponent({
                 return monitorManager.getFeature(this.monitorId, "powerstate")
                     .value
             } catch {}
-        },
-        css() {
-            return css
-        },
-        sheet() {
-            return sheet
         },
     },
     methods: {
