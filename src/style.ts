@@ -1,6 +1,7 @@
 import { css } from "@emotion/css"
 import { invoke } from "@tauri-apps/api/tauri"
-import { autorun, observable, runInAction } from "mobx"
+import { reactive, watchEffect } from "vue"
+import { watchDebounced } from "@vueuse/core"
 import panelState from "./wm"
 
 export interface Color {
@@ -21,159 +22,155 @@ export interface AccentColors {
     foreground: Color
 }
 
-export const colors = observable(
-    await invoke<AccentColors>("get_accent_colors"),
-)
+export const colors = reactive(await invoke<AccentColors>("get_accent_colors"))
 
 function colorToCSS(color: Color): string {
     return `rgb(${color.r}, ${color.g}, ${color.b})`
 }
 
-export const sheet = observable<{ [key: string]: string }>({})
+export const sheet = reactive<{ [key: string]: string }>({})
 
-autorun(() =>
-    runInAction(() => {
-        const icon = css`
-            display: inline-block;
-            font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets";
-            transform: scale(1.1) translateY(0.12em);
-            width: 1.1em;
-            margin: 0 0.4em;
-            text-align: center;
-        `
+watchEffect(() => {
+    const icon = css`
+        display: inline-block;
+        font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets";
+        transform: scale(1.1) translateY(0.12em);
+        width: 1.1em;
+        margin: 0 0.4em;
+        text-align: center;
+    `
 
-        const resetSpacing = css`
-            @layer reset {
-                margin: 0;
-                padding: 0;
-            }
-        `
+    const resetSpacing = css`
+        @layer reset {
+            margin: 0;
+            padding: 0;
+        }
+    `
 
-        const resetAppearance = css`
-            @layer reset {
-                appearance: none;
-            }
-        `
+    const resetAppearance = css`
+        @layer reset {
+            appearance: none;
+        }
+    `
 
-        const resetInput = css`
-            ${resetSpacing};
+    const resetInput = css`
+        ${resetSpacing};
+        ${resetAppearance};
+        @layer reset {
+            font: inherit;
+            color: inherit;
+            box-sizing: content-box;
+            background: none;
+            border: none;
+        }
+    `
+
+    const borderlessButton = css`
+        ${resetInput};
+        cursor: pointer;
+        opacity: 0.7;
+
+        &:hover {
+            opacity: 1;
+        }
+    `
+
+    const borderlessNumber = css`
+        ${resetInput};
+        &::-webkit-inner-spin-button,
+        &::-webkit-outer-spin-button {
             ${resetAppearance};
-            @layer reset {
-                font: inherit;
-                color: inherit;
-                box-sizing: content-box;
-                background: none;
-                border: none;
-            }
-        `
+            margin: 0;
+        }
+    `
 
-        const borderlessButton = css`
-            ${resetInput};
-            cursor: pointer;
-            opacity: 0.7;
+    const block = css`
+        display: block;
+    `
 
-            &:hover {
-                opacity: 1;
-            }
-        `
+    const flex = css`
+        display: flex;
+        & > * {
+            ${block};
+        }
+    `
 
-        const borderlessNumber = css`
-            ${resetInput};
-            &::-webkit-inner-spin-button,
-            &::-webkit-outer-spin-button {
-                ${resetAppearance};
-                margin: 0;
-            }
-        `
+    const horizontalFlex = css`
+        ${flex};
+        flex-direction: row;
+    `
 
-        const block = css`
-            display: block;
-        `
+    const verticalFlex = css`
+        ${flex};
+        flex-direction: column;
+    `
 
-        const flex = css`
-            display: flex;
-            & > * {
-                ${block};
-            }
-        `
+    const spreadContent = css`
+        justify-content: space-between;
+        & > * {
+            flex-grow: 0;
+        }
+    `
 
-        const horizontalFlex = css`
-            ${flex};
-            flex-direction: row;
-        `
+    const stretchContent = css`
+        justify-content: stretch;
+    `
 
-        const verticalFlex = css`
-            ${flex};
-            flex-direction: column;
-        `
+    const centerItems = css`
+        align-items: center;
+    `
 
-        const spreadContent = css`
-            justify-content: space-between;
-            & > * {
-                flex-grow: 0;
-            }
-        `
+    const stretchItems = css`
+        align-items: stretch;
+    `
 
-        const stretchContent = css`
-            justify-content: stretch;
-        `
+    const fillWidth = css`
+        width: 100%;
+    `
 
-        const centerItems = css`
-            align-items: center;
-        `
+    const titleFont = css`
+        font-size: 1.1rem;
+        font-variation-settings: "wght" 350;
+    `
 
-        const stretchItems = css`
-            align-items: stretch;
-        `
+    const bigIcon = css`
+        ${icon};
+        font-weight: 300;
+        transform: scale(1.6) translateY(0.12em);
+        width: 1.6em;
+        margin: 0 0.6em;
+    `
 
-        const fillWidth = css`
-            width: 100%;
-        `
+    const cozyLine = css`
+        line-height: 2.2;
+    `
 
-        const titleFont = css`
-            font-size: 1.1rem;
-            font-variation-settings: "wght" 350;
-        `
+    const grow = css`
+        flex-grow: 1;
+    `
 
-        const bigIcon = css`
-            ${icon};
-            font-weight: 300;
-            transform: scale(1.6) translateY(0.12em);
-            width: 1.6em;
-            margin: 0 0.6em;
-        `
-
-        const cozyLine = css`
-            line-height: 2.2;
-        `
-
-        const grow = css`
-            flex-grow: 1;
-        `
-
-        Object.assign(sheet, {
-            icon,
-            resetSpacing,
-            resetAppearance,
-            resetInput,
-            borderlessButton,
-            borderlessNumber,
-            block,
-            flex,
-            horizontalFlex,
-            verticalFlex,
-            spreadContent,
-            stretchContent,
-            centerItems,
-            stretchItems,
-            fillWidth,
-            titleFont,
-            bigIcon,
-            cozyLine,
-            grow,
-        })
-    }),
-)
+    Object.assign(sheet, {
+        icon,
+        resetSpacing,
+        resetAppearance,
+        resetInput,
+        borderlessButton,
+        borderlessNumber,
+        block,
+        flex,
+        horizontalFlex,
+        verticalFlex,
+        spreadContent,
+        stretchContent,
+        centerItems,
+        stretchItems,
+        fillWidth,
+        titleFont,
+        bigIcon,
+        cozyLine,
+        grow,
+    })
+})
 
 export function makeSliderStyle(value: number) {
     return css`
@@ -225,17 +222,14 @@ export function makeSliderStyle(value: number) {
     `
 }
 
-autorun(
-    () => {
-        if (panelState.focused) {
+watchDebounced(
+    () => panelState.focused,
+    focused => {
+        if (focused) {
             invoke<AccentColors>("get_accent_colors").then(newColors =>
-                runInAction(() => {
-                    Object.assign(colors, newColors)
-                }),
+                Object.assign(colors, newColors),
             )
         }
     },
-    {
-        delay: 10,
-    },
+    { debounce: 10 },
 )

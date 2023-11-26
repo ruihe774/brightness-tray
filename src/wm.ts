@@ -1,7 +1,8 @@
 import { LogicalSize, appWindow } from "@tauri-apps/api/window"
-import { autorun, observable, runInAction } from "mobx"
+import { reactive } from "vue"
+import { watchDebounced } from "@vueuse/core"
 
-const panelState = observable({
+const panelState = reactive({
     width: 0,
     height: 0,
     focused: false,
@@ -10,41 +11,34 @@ const panelState = observable({
 const resizoObserver = new ResizeObserver(entries => {
     const entry = entries[0]
     const borderBox = entry.borderBoxSize[0]
-    runInAction(() => {
-        panelState.width = borderBox.inlineSize
-        panelState.height = borderBox.blockSize
-    })
+    panelState.width = borderBox.inlineSize
+    panelState.height = borderBox.blockSize
 })
 resizoObserver.observe(document.getElementsByTagName("html")[0])
 
 appWindow.onFocusChanged(({ payload }) => {
-    runInAction(() => {
-        panelState.focused = payload
-    })
+    panelState.focused = payload
 })
 
-autorun(
-    () => {
-        const { width, height } = panelState
+watchDebounced(
+    () => ({ width: panelState.width, height: panelState.height }),
+    ({ width, height }) => {
         if (width * height > 30000) {
             appWindow.setSize(new LogicalSize(width, height))
         }
     },
-    {
-        delay: 500,
-    },
+    { debounce: 500 },
 )
 
 if (import.meta.env.PROD) {
-    autorun(
-        () => {
-            if (!panelState.focused) {
+    watchDebounced(
+        () => panelState.focused,
+        focused => {
+            if (!focused) {
                 appWindow.hide()
             }
         },
-        {
-            delay: 100,
-        },
+        { debounce: 100 },
     )
 }
 

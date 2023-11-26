@@ -1,23 +1,9 @@
 import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
+import vue from '@vitejs/plugin-vue'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [
-        react({
-            babel: {
-                plugins: [
-                    [
-                        "@babel/plugin-proposal-decorators",
-                        { version: "2023-05" },
-                    ],
-                    "jsx-classlist",
-                    "@emotion/babel-plugin",
-                ],
-            },
-        }),
-    ],
-
+    plugins: [vue()],
     build: { target: "esnext" },
 
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

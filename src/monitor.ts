@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api"
-import { action, autorun, flow, observable, runInAction } from "mobx"
+import { reactive, watch } from "vue"
+import { watchDebounced } from "@vueuse/core"
 import settings from "./settings"
 
 export interface Reply {
@@ -59,50 +60,24 @@ async function getFeatures(
 }
 
 export class Manager {
-    @observable accessor monitors: Monitor[]
+    readonly monitors: Monitor[] = reactive([])
 
-    constructor() {
-        this.monitors = []
-
-        autorun(
-            () => {
-                for (const monitor of this.monitors) {
-                    for (const feature of monitor.features) {
-                        if (feature.syncing) {
-                            runInAction(() => {
-                                feature.syncing = false
-                            })
-                            invoke("set_monitor_feature", {
-                                id: monitor.id,
-                                feature: feature.name,
-                                value: feature.value.current,
-                            }).catch(() => {
-                                this.refreshFeature(monitor.id, feature.name)
-                            })
-                        }
-                    }
-                }
-            },
-            {
-                delay: settings.updateInterval,
-            },
-        )
-    }
-
-    @flow
-    *refreshMonitors(): Generator<Promise<any>, void, any> {
-        yield invoke("refresh_monitors")
-        const monitor_ids: string[] = yield invoke("get_monitors")
-        const monitor_names: (string | null)[] = yield Promise.all(
+    async refreshMonitors() {
+        await invoke("refresh_monitors")
+        const monitor_ids = await invoke<string[]>("get_monitors")
+        const monitor_names = await Promise.all(
             monitor_ids.map(id => {
                 try {
-                    return invoke("get_monitor_user_friendly_name", { id })
+                    return invoke<string | null>(
+                        "get_monitor_user_friendly_name",
+                        { id },
+                    )
                 } catch {
                     return null
                 }
             }),
         )
-        const monitor_features: Feature[][] = yield Promise.all(
+        const monitor_features = await Promise.all(
             monitor_ids.map(id =>
                 getFeatures(
                     id,
@@ -135,13 +110,9 @@ export class Manager {
         throw new Error(`no such monitor: '${id}'`)
     }
 
-    @flow
-    *refreshFeature(
-        id: string,
-        name: string,
-    ): Generator<Promise<any>, void, any> {
+    async refreshFeature(id: string, name: string) {
         const monitor = this.getMonitor(id)
-        const features: Feature[] = yield getFeatures(id, [name])
+        const features = await getFeatures(id, [name])
         const feature = features[0]
         const idx = monitor.features.findIndex(f => f.name == feature.name)
         if (idx == -1) {
@@ -160,7 +131,6 @@ export class Manager {
         throw new Error(`monitor '${id}' has no such feature: '${name}'`)
     }
 
-    @action
     setFeature(id: string, name: string, value: number) {
         const feature = this.getFeature(id, name)
         feature.value.current = value
@@ -168,4 +138,38 @@ export class Manager {
     }
 }
 
-export default new Manager()
+const monitorManager = new Manager()
+
+watch(
+    () => settings.updateInterval,
+    (updateInterval, _old, onCleanup) => {
+        onCleanup(
+            watchDebounced(
+                monitorManager.monitors,
+                monitors => {
+                    for (const monitor of monitors) {
+                        for (const feature of monitor.features) {
+                            if (feature.syncing) {
+                                feature.syncing = false
+                                invoke("set_monitor_feature", {
+                                    id: monitor.id,
+                                    feature: feature.name,
+                                    value: feature.value.current,
+                                }).catch(() => {
+                                    monitorManager.refreshFeature(
+                                        monitor.id,
+                                        feature.name,
+                                    )
+                                })
+                            }
+                        }
+                    }
+                },
+                { debounce: updateInterval },
+            ),
+        )
+    },
+    { immediate: true },
+)
+
+export default monitorManager
