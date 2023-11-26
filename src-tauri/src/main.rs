@@ -381,10 +381,14 @@ fn main() {
         .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::LeftClick { position, .. } => {
                 let window = app.get_window("panel").unwrap();
-                locate_panel(&window, &position);
-                window.show().unwrap();
-                enable_mica(&window).unwrap();
-                window.set_focus().unwrap();
+                if window.is_visible().unwrap_or_default() {
+                    window.hide().unwrap()
+                } else {
+                    locate_panel(&window, &position);
+                    window.show().unwrap();
+                    enable_mica(&window).unwrap();
+                    window.set_focus().unwrap();
+                }
             }
             SystemTrayEvent::MenuItemClick { id, .. } if id == "quit" => {
                 app.exit(0);
