@@ -1,13 +1,28 @@
-import { watchThrottled } from "@vueuse/core"
+import { watch } from "vue"
+import { debounce } from "lodash-es"
 
 export function watchDelayed(source, cb, options) {
     if (typeof options == "number") {
         options = {
-            throttle: options,
+            delay: options,
         }
     }
-    options = options ?? {}
-    options.leading = false
-    options.trailing = true
-    return watchThrottled(source, cb, options)
+    options = {
+        leading: false,
+        trailing: true,
+        ...options,
+    }
+    const debounceOptions = {
+        leading: options.leading,
+        trailing: options.trailing,
+        maxWait: options.delay,
+    }
+    delete options.leading
+    delete options.trailing
+    delete options.delay
+    return watch(
+        source,
+        debounce(cb, debounceOptions.maxWait, debounceOptions),
+        options,
+    )
 }
