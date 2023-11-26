@@ -31,10 +31,9 @@ const MonitorItem = observer(function MonitorItem(props: MonitorProps) {
             className={sheet.borderlessButton}
             onClick={handlePowerOff}
         >
-            <span className={sheet.icon} aria-hidden>
+            <span className={sheet.icon} aria-label="power off">
                 &#xE7E8;
             </span>
-            <span>Power off</span>
         </button>
     ) : null
 
@@ -163,9 +162,9 @@ const FeatureSlider = observer(function FeatureSlider(
             <output
                 className={css`
                     ${sheet.titleFont};
-                    width: 3ch;
+                    width: 1.7em;
                     text-align: center;
-                    margin-left: 2ch;
+                    margin-left: 0.5em;
                 `}
             >
                 {current}
