@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::ffi::c_void;
-use std::mem;
+use std::mem::{self, MaybeUninit};
 
 use monitor::{Feature, Monitor};
 use serde::{Deserialize, Serialize};
@@ -216,18 +216,11 @@ fn enable_mica(window: &Window) -> windows::core::Result<()> {
 }
 
 fn locate_panel(window: &Window, pos: &tauri::PhysicalPosition<f64>) {
-    use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-    use windows::Win32::Foundation::{HWND, POINT, RECT};
+    use tauri::{LogicalPosition, PhysicalPosition};
+    use windows::Win32::Foundation::POINT;
     use windows::Win32::Graphics::Gdi::{
         GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTOPRIMARY,
     };
-    use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
-
-    let handle = window.raw_window_handle();
-    let RawWindowHandle::Win32(handle) = handle else {
-        panic!("failed to get HWND");
-    };
-    let hwnd = HWND(handle.hwnd as isize);
 
     let hmonitor = unsafe {
         MonitorFromPoint(
@@ -238,21 +231,24 @@ fn locate_panel(window: &Window, pos: &tauri::PhysicalPosition<f64>) {
             MONITOR_DEFAULTTOPRIMARY,
         )
     };
-    let mut info = MONITORINFO::default();
-    info.cbSize = mem::size_of::<MONITORINFO>() as u32;
-    unsafe { GetMonitorInfoW(hmonitor, &mut info) };
-    let mrect = info.rcWork;
+    let mut info: MaybeUninit<MONITORINFO> = mem::MaybeUninit::uninit();
+    unsafe { info.assume_init_mut() }.cbSize = mem::size_of::<MONITORINFO>() as u32;
+    if !unsafe { GetMonitorInfoW(hmonitor, info.as_mut_ptr()) }.as_bool() {
+        return;
+    }
+    let mrect = unsafe { info.assume_init() }.rcWork;
 
-    let mut wrect = RECT::default();
-    unsafe { GetWindowRect(hwnd, &mut wrect) }.unwrap();
-    let w = wrect.right - wrect.left;
-    let h = wrect.bottom - wrect.top;
-    let x = mrect.right - w - 16;
-    let y = mrect.bottom - h - 16;
-
-    window
-        .set_position(tauri::PhysicalPosition { x, y })
-        .unwrap()
+    let Ok(wsize) = window.inner_size() else {
+        return;
+    };
+    let npos = PhysicalPosition {
+        x: mrect.right as u32 - wsize.width,
+        y: mrect.bottom as u32 - wsize.height,
+    };
+    let mut npos = LogicalPosition::<f64>::from_physical(npos, window.scale_factor().unwrap_or(1.));
+    npos.x -= 12.;
+    npos.y -= 12.;
+    let _ = window.set_position(npos);
 }
 
 const MESSAGE_CAPTION: &str = "Brightness Tray\0";
