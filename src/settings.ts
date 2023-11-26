@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/tauri"
 import { observable } from "mobx"
 
 export interface Settings {

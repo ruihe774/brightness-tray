@@ -11,6 +11,7 @@ export default defineConfig({
                         "@babel/plugin-proposal-decorators",
                         { version: "2023-05" },
                     ],
+                    "jsx-classlist",
                     "@emotion/babel-plugin",
                 ],
             },

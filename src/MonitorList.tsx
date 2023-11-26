@@ -1,5 +1,4 @@
 import { css } from "@emotion/css"
-import classNames from "classnames"
 import { observer } from "mobx-react-lite"
 import React, { useCallback } from "react"
 import monitorManager from "./monitor"
@@ -39,24 +38,24 @@ const MonitorItem = observer(function MonitorItem(props: MonitorProps) {
 
     const nameRow = (
         <div
-            className={classNames(
+            classList={[
                 sheet.horizontalFlex,
                 sheet.spreadContent,
                 sheet.centerItems,
                 sheet.cozyLine,
-            )}
+            ]}
         >
             <div>
                 <span className={sheet.bigIcon} aria-label="monitor">
                     &#xE7F4;
                 </span>
                 <span
-                    className={classNames(
+                    classList={[
                         sheet.titleFont,
                         css`
                             margin-left: 0.15em;
                         `,
-                    )}
+                    ]}
                 >
                     {name}
                 </span>
@@ -83,11 +82,11 @@ const MonitorItem = observer(function MonitorItem(props: MonitorProps) {
         >
             {nameRow}
             <ul
-                className={classNames(
+                classList={[
                     sheet.resetSpacing,
                     sheet.verticalFlex,
                     sheet.stretchItems,
-                )}
+                ]}
             >
                 {sliders}
             </ul>
@@ -100,11 +99,11 @@ export default observer(function MonitorList() {
 
     return (
         <ul
-            className={classNames(
+            classList={[
                 sheet.resetSpacing,
                 sheet.verticalFlex,
                 sheet.stretchItems,
-            )}
+            ]}
         >
             {monitors.map(({ id }) => (
                 <li key={id} className={sheet.resetSpacing}>
@@ -146,7 +145,7 @@ const FeatureSlider = observer(function FeatureSlider(
     }
 
     return (
-        <label className={classNames(sheet.flex, sheet.cozyLine)}>
+        <label classList={[sheet.flex, sheet.cozyLine]}>
             <span className={sheet.bigIcon} aria-label={feature}>
                 {iconMap[feature]}
             </span>
@@ -157,15 +156,17 @@ const FeatureSlider = observer(function FeatureSlider(
                 max={maximum}
                 value={current}
                 onChange={handleChange}
-                className={classNames(sheet.grow, makeSliderStyle(current))}
+                classList={[sheet.grow, makeSliderStyle(current)]}
             />
             <output
-                className={css`
-                    ${sheet.titleFont};
-                    width: 1.7em;
-                    text-align: center;
-                    margin-left: 0.5em;
-                `}
+                classList={[
+                    sheet.titleFont,
+                    css`
+                        width: 1.7em;
+                        text-align: center;
+                        margin-left: 0.5em;
+                    `,
+                ]}
             >
                 {current}
             </output>
