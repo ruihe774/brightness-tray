@@ -12,4 +12,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 
 monitorManager.refreshMonitors()
 
-document.addEventListener("contextmenu", e => e.preventDefault())
+if (import.meta.env.PROD) {
+    document.addEventListener("contextmenu", e => e.preventDefault())
+}

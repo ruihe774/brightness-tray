@@ -35,15 +35,17 @@ autorun(
     },
 )
 
-autorun(
-    () => {
-        if (!panelState.focused) {
-            appWindow.hide()
-        }
-    },
-    {
-        delay: 100,
-    },
-)
+if (import.meta.env.PROD) {
+    autorun(
+        () => {
+            if (!panelState.focused) {
+                appWindow.hide()
+            }
+        },
+        {
+            delay: 100,
+        },
+    )
+}
 
 export default panelState
