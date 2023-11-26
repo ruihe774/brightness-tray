@@ -43,27 +43,46 @@ autorun(() =>
         `
 
         const resetSpacing = css`
-            margin: 0;
-            padding: 0;
+            @layer reset {
+                margin: 0;
+                padding: 0;
+            }
         `
 
-        const resetButton = css`
+        const resetAppearance = css`
+            @layer reset {
+                appearance: none;
+            }
+        `
+
+        const resetInput = css`
             ${resetSpacing};
-            appearance: none;
-            font: inherit;
-            color: inherit;
-            box-sizing: content-box;
-            background: none;
-            border: none;
+            ${resetAppearance};
+            @layer reset {
+                font: inherit;
+                color: inherit;
+                box-sizing: content-box;
+                background: none;
+                border: none;
+            }
         `
 
         const borderlessButton = css`
-            ${resetButton};
+            ${resetInput};
             cursor: pointer;
             opacity: 0.7;
 
             &:hover {
                 opacity: 1;
+            }
+        `
+
+        const borderlessNumber = css`
+            ${resetInput};
+            &::-webkit-inner-spin-button,
+            &::-webkit-outer-spin-button {
+                ${resetAppearance};
+                margin: 0;
             }
         `
 
@@ -135,8 +154,10 @@ autorun(() =>
         Object.assign(sheet, {
             icon,
             resetSpacing,
-            resetButton,
+            resetAppearance,
+            resetInput,
             borderlessButton,
+            borderlessNumber,
             block,
             flex,
             horizontalFlex,
@@ -165,10 +186,11 @@ export function makeSliderStyle(value: number) {
             --slider-track-color: #9b9b9b;
         }
 
-        -webkit-appearance: none;
-        background: none;
+        ${sheet.resetInput};
+        margin: 0.15rem;
+
         &::-webkit-slider-thumb {
-            -webkit-appearance: none;
+            ${sheet.resetInput};
             box-sizing: content-box;
             height: 0.7rem;
             width: 0.7rem;
@@ -189,7 +211,7 @@ export function makeSliderStyle(value: number) {
                 transform 0.15s;
         }
         &::-webkit-slider-runnable-track {
-            -webkit-appearance: none;
+            ${sheet.resetInput};
             background: linear-gradient(
                 to right,
                 var(--slider-thumb-color),

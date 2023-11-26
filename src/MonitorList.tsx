@@ -53,7 +53,7 @@ const MonitorItem = observer(function MonitorItem(props: MonitorProps) {
                     classList={[
                         sheet.titleFont,
                         css`
-                            margin-left: 0.15em;
+                            margin-inline-start: 0.15em;
                         `,
                     ]}
                 >
@@ -77,7 +77,7 @@ const MonitorItem = observer(function MonitorItem(props: MonitorProps) {
     return (
         <div
             className={css`
-                padding-right: 0.6em;
+                padding-inline-end: 0.6em;
             `}
         >
             {nameRow}
@@ -130,8 +130,10 @@ const FeatureSlider = observer(function FeatureSlider(
 
     const handleChange = useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {
-            const value = Number(e.target.value)
-            monitorManager.setFeature(monitorId, feature, value)
+            if (e.target.validity.valid) {
+                const value = Number(e.target.value)
+                monitorManager.setFeature(monitorId, feature, value)
+            }
         },
         [monitorId, feature],
     )
@@ -158,18 +160,24 @@ const FeatureSlider = observer(function FeatureSlider(
                 onChange={handleChange}
                 classList={[sheet.grow, makeSliderStyle(current)]}
             />
-            <output
+            <input
+                type="number"
+                step="1"
+                min="0"
+                max={maximum}
+                value={current}
+                onChange={handleChange}
+                role="status"
                 classList={[
+                    sheet.borderlessNumber,
                     sheet.titleFont,
                     css`
                         width: 1.7em;
                         text-align: center;
-                        margin-left: 0.5em;
+                        margin-inline-start: 0.5em;
                     `,
                 ]}
-            >
-                {current}
-            </output>
+            />
         </label>
     )
 })
