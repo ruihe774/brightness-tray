@@ -1,8 +1,7 @@
 <script lang="ts">
-import { css } from "@emotion/css"
 import { defineComponent } from "vue"
-import { sheet, makeSliderStyle } from "../style"
 import monitorManager from "../monitor"
+import sheet from "../style.module.sass"
 
 const iconMap = {
     luminance: "\uE706",
@@ -25,7 +24,6 @@ export default defineComponent({
     },
     setup() {
         return {
-            css,
             sheet,
         }
     },
@@ -38,9 +36,6 @@ export default defineComponent({
         },
         maximum() {
             return this.featureValue.maximum
-        },
-        sliderStyle() {
-            return makeSliderStyle(this.current)
         },
         icon() {
             return (iconMap as { [key: string]: string })[this.feature]
@@ -94,7 +89,8 @@ export default defineComponent({
             :value="current"
             @input="handleInput"
             @wheel="handleWheel"
-            :class="[sheet.grow, sliderStyle]"
+            :class="[sheet.grow, sheet.slider]"
+            :style="`--slider-value: ${(current / maximum) * 100}%`"
         />
         <input
             type="number"
@@ -105,15 +101,8 @@ export default defineComponent({
             @input="handleInput"
             @wheel.prevent="handleWheel"
             role="status"
-            :class="[
-                sheet.borderlessNumber,
-                sheet.titleFont,
-                css`
-                    width: 1.7em;
-                    text-align: center;
-                    margin-inline-start: 0.5em;
-                `,
-            ]"
+            :class="[sheet.borderlessNumber, sheet.titleFont]"
+            style="width: 1.7em; text-align: center; margin-inline-start: 0.5em"
         />
     </label>
 </template>

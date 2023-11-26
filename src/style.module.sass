@@ -1,0 +1,122 @@
+.icon
+    display: inline-block
+    font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets"
+    transform: scale(1.1) translateY(0.12em)
+    width: 1.1em
+    margin: 0 0.4em
+    text-align: center
+
+.resetSpacing
+    @layer reset
+        margin: 0
+        padding: 0
+
+.resetAppearance
+    @layer reset
+        appearance: none
+
+.resetInput
+    @extend .resetSpacing
+    @extend .resetAppearance
+    @layer reset
+        font: inherit
+        color: inherit
+        box-sizing: content-box
+        background: none
+        border: none
+
+.borderlessButton
+    @extend .resetInput
+    cursor: pointer
+    opacity: 0.7
+
+    &:hover
+        opacity: 1
+
+.borderlessNumber
+    @extend .resetInput
+    &::-webkit-inner-spin-button, &::-webkit-outer-spin-button
+        @extend .resetAppearance
+        margin: 0
+
+.block
+    display: block
+
+.flex
+    display: flex
+    & > *
+        @extend .block
+
+.horizontalFlex
+    @extend .flex
+    flex-direction: row
+
+.verticalFlex
+    @extend .flex
+    flex-direction: column
+
+.spreadContent
+    justify-content: space-between
+    & > *
+        flex-grow: 0
+
+.stretchContent
+    justify-content: stretch
+
+.centerItems
+    align-items: center
+
+.stretchItems
+    align-items: stretch
+
+.fillWidth
+    width: 100%
+
+.titleFont
+    font-size: 1.1rem
+    font-variation-settings: "wght" 350
+
+.bigIcon
+    @extend .icon
+    font-weight: 300
+    transform: scale(1.6) translateY(0.12em)
+    width: 1.6em
+    margin: 0 0.6em
+
+.cozyLine
+    line-height: 2.2
+
+.grow
+    flex-grow: 1
+
+.slider
+    --slider-thumb-color: var(--accent-dark1)
+    --slider-thumb-border: #ffffff
+    --slider-track-color: #868686
+    @media screen and (prefers-color-scheme: dark)
+        --slider-thumb-color: var(--accent-light2)
+        --slider-thumb-border: #414141
+        --slider-track-color: #9b9b9b
+
+    @extend .resetInput
+    margin: 0.15rem
+
+    &::-webkit-slider-thumb
+        @extend .resetInput
+        box-sizing: content-box
+        height: 0.7rem
+        width: 0.7rem
+        border-radius: 1em
+        background: var(--slider-thumb-color)
+        box-shadow: 0 0 0 0.3rem var(--slider-thumb-border), 0 0.04rem 0.2rem 0 rgba(0, 0, 0, 0.6)
+        transform: translateY(-0.2rem) scale(1)
+        &:hover
+            box-shadow: 0 0 0 0.15rem var(--slider-thumb-border), 0 0.04rem 0.2rem 0 rgba(0, 0, 0, 0.6)
+            transform: translateY(-0.2rem) scale(1.3)
+        transition: box-shadow 0.15s, transform 0.15s
+
+    &::-webkit-slider-runnable-track
+        @extend .resetInput
+        background: linear-gradient(to right, var(--slider-thumb-color), var(--slider-thumb-color) var(--slider-value), var(--slider-track-color) var(--slider-value), var(--slider-track-color))
+        height: 0.3rem
+        border-radius: 0.6rem

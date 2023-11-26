@@ -1,10 +1,9 @@
 <script lang="ts">
-import { css } from "@emotion/css"
 import { defineComponent } from "vue"
-import { sheet } from "../style"
 import monitorManager from "../monitor"
 import settings from "../settings"
 import FeatureSlider from "./FeatureSlider.vue"
+import sheet from "../style.module.sass"
 
 export default defineComponent({
     props: {
@@ -15,7 +14,6 @@ export default defineComponent({
     },
     setup() {
         return {
-            css,
             sheet,
         }
     },
@@ -49,13 +47,7 @@ export default defineComponent({
 </script>
 
 <template>
-    <div
-        :class="
-            css`
-                padding-inline-end: 0.6em;
-            `
-        "
-    >
+    <div style="padding-inline-end: 0.6em">
         <div
             :class="[
                 sheet.horizontalFlex,
@@ -69,12 +61,8 @@ export default defineComponent({
                     &#xE7F4;
                 </span>
                 <span
-                    :class="[
-                        sheet.titleFont,
-                        css`
-                            margin-inline-start: 0.15em;
-                        `,
-                    ]"
+                    :class="sheet.titleFont"
+                    style="margin-inline-start: 0.15em"
                 >
                     {{ name }}
                 </span>

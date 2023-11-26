@@ -1,7 +1,7 @@
 import { createApp } from "vue"
 import monitorManager from "./monitor"
 import Panel from "./components/Panel.vue"
-import "./style.css"
+import "./style.global.sass"
 
 createApp(Panel).mount("#root")
 

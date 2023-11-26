@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { sheet } from "../style"
 import monitorManager from "../monitor"
 import MonitorItem from "./MonitorItem.vue"
+import sheet from "../style.module.sass"
 const { monitors } = monitorManager
 </script>
 
