@@ -255,6 +255,8 @@ fn locate_panel(window: &Window, pos: &tauri::PhysicalPosition<f64>) {
         .unwrap()
 }
 
+const MESSAGE_CAPTION: &str = "Brightness Tray\0";
+
 fn hook_panic() {
     use windows::core::PCWSTR;
     use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
@@ -262,7 +264,7 @@ fn hook_panic() {
     std::panic::set_hook(Box::new(|info| {
         let text = format!("The program {info}\0");
         let wtext: Vec<_> = text.encode_utf16().collect();
-        let caption = "Brightness Tray\0";
+        let caption = MESSAGE_CAPTION;
         let wcaption: Vec<_> = caption.encode_utf16().collect();
         unsafe {
             MessageBoxW(
@@ -299,7 +301,7 @@ fn ensure_singleton() {
                 #[cfg(debug_assertions)]
                 panic!("another instance is running");
                 let text = b"Another instance is running.\0";
-                let caption = b"Brightness Tray\0";
+                let caption = MESSAGE_CAPTION.as_bytes();
                 let r = unsafe {
                     MessageBoxA(
                         None,
@@ -320,9 +322,41 @@ fn ensure_singleton() {
     )
 }
 
+fn ensure_windows_version() {
+    use std::process::exit;
+    use windows::core::PCSTR;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        MessageBoxA, IDABORT, IDIGNORE, IDRETRY, MB_ABORTRETRYIGNORE, MB_ICONWARNING,
+    };
+    use windows_version::OsVersion;
+
+    let version = OsVersion::current();
+    if version.build < 22621 {
+        #[cfg(debug_assertions)]
+        panic!("unsupported Windows version");
+        let text = b"Unsupported Windows version. Please upgrade your system to Windows 11 22H2 or later.\0";
+        let caption = MESSAGE_CAPTION.as_bytes();
+        let r = unsafe {
+            MessageBoxA(
+                None,
+                PCSTR::from_raw(text.as_ptr()),
+                PCSTR::from_raw(caption.as_ptr()),
+                MB_ABORTRETRYIGNORE | MB_ICONWARNING,
+            )
+        };
+        return match r {
+            IDABORT => exit(0),
+            IDRETRY => ensure_windows_version(),
+            IDIGNORE => (),
+            _ => unreachable!(),
+        };
+    }
+}
+
 fn main() {
     use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
     hook_panic();
+    ensure_windows_version();
     ensure_singleton();
     monitor::init_com().expect("failed to initialize COM");
     tauri::Builder::default()
