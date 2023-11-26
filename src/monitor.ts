@@ -135,15 +135,6 @@ export class Manager {
         throw new Error(`no such monitor: '${id}'`)
     }
 
-    hasMonitor(id: string): boolean {
-        try {
-            this.getMonitor(id)
-            return true
-        } catch {
-            return false
-        }
-    }
-
     @flow
     *refreshFeature(
         id: string,
@@ -167,15 +158,6 @@ export class Manager {
             return feature
         }
         throw new Error(`monitor '${id}' has no such feature: '${name}'`)
-    }
-
-    hasFeature(id: string, name: string): boolean {
-        try {
-            this.getFeature(id, name)
-            return true
-        } catch {
-            return false
-        }
     }
 
     @action

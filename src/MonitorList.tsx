@@ -15,26 +15,32 @@ const MonitorItem = observer(function MonitorItem(props: MonitorProps) {
     const monitor = monitorManager.getMonitor(monitorId)
     const name = monitor.name ?? monitor.id.split("#")[1]
 
+    let powerStateMaximum = 0
+    try {
+        powerStateMaximum = monitorManager.getFeature(monitorId, "powerstate")
+            .value.maximum
+    } catch {}
+
     const handlePowerOff = useCallback(() => {
-        let value = settings.ddcPowerOffValue
-        const feature = monitorManager.getFeature(monitorId, "powerstate")
-        if (feature.value.maximum) {
-            value = Math.max(4, Math.min(value, feature.value.maximum))
-        }
-        monitorManager.setFeature(monitorId, "powerstate", value)
+        monitorManager.setFeature(
+            monitorId,
+            "powerstate",
+            Math.min(settings.ddcPowerOffValue, powerStateMaximum),
+        )
     }, [monitorId])
 
-    const powerButton = monitorManager.hasFeature(monitorId, "powerstate") ? (
-        <button
-            type="button"
-            className={sheet.borderlessButton}
-            onClick={handlePowerOff}
-        >
-            <span className={sheet.icon} aria-label="power off">
-                &#xE7E8;
-            </span>
-        </button>
-    ) : null
+    const powerButton =
+        powerStateMaximum >= 4 ? (
+            <button
+                type="button"
+                className={sheet.borderlessButton}
+                onClick={handlePowerOff}
+            >
+                <span className={sheet.icon} aria-label="power off">
+                    &#xE7E8;
+                </span>
+            </button>
+        ) : null
 
     const nameRow = (
         <div

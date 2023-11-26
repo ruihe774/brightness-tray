@@ -7,5 +7,5 @@ export interface Settings {
 
 export default observable<Settings>({
     updateInterval: 500,
-    ddcPowerOffValue: 4,
+    ddcPowerOffValue: 6,
 })
