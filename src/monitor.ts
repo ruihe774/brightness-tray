@@ -165,7 +165,7 @@ watch(
                         }
                     }
                 },
-                updateInterval,
+                { delay: updateInterval, leading: true },
             ),
         )
     },

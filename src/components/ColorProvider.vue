@@ -26,12 +26,10 @@ const accents = ref<AccentColors>()
 
 watchDelayed(
     () => panelState.focused,
-    async focused => {
-        if (focused || accents.value == null) {
-            accents.value = await invoke<AccentColors>("get_accent_colors")
-        }
+    async _focused => {
+        accents.value = await invoke<AccentColors>("get_accent_colors")
     },
-    { throttle: 10, immediate: true },
+    { delay: 1000, immediate: true, leading: true },
 )
 
 const colors = computed(() => {
