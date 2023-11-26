@@ -22,7 +22,6 @@
     "bundle": {
       "identifier": "io.misakikasumi.brightness-tray",
       "publisher": "Misaki Kasumi",
-      "shortDescription": "Manage the brightness of monitors from your system tray",
       "category": "Utility",
       "icon": [
         "icons/light.ico"
