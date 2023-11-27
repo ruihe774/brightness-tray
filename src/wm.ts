@@ -27,20 +27,42 @@ appWindow.onFocusChanged(({ payload }) => {
     panelState.focused = payload
 })
 
-watchDelayed(
-    () => ({ width: panelState.width, height: panelState.height }),
-    ({ width, height }) => {
-        if (width * height > 30000) {
-            appWindow.setSize(new LogicalSize(width, height))
-        }
-    },
-    500,
-)
-
 interface RawPosition {
     x: number
     y: number
 }
+
+async function locatePanel(positionInMonitor?: RawPosition) {
+    const anchorPosition =
+        positionInMonitor ?? (await appWindow.innerPosition())
+    const windowSize = new LogicalSize(
+        Math.max(300, panelState.width),
+        Math.max(50, panelState.height),
+    )
+    const { width, height } = windowSize
+    const cornerPosition = await invoke<RawPosition>("get_workarea_corner", {
+        position: {
+            x: anchorPosition.x,
+            y: anchorPosition.y,
+        },
+    })
+    let { x: right, y: bottom } = new PhysicalPosition(
+        cornerPosition.x,
+        cornerPosition.y,
+    ).toLogical(await appWindow.scaleFactor())
+    right -= 12
+    bottom -= 12
+    const windowPosition = new LogicalPosition(right - width, bottom - height)
+    await appWindow.setPosition(windowPosition)
+    await appWindow.setSize(windowSize)
+}
+
+watchDelayed(() => (panelState.width, panelState.height, void 0), locatePanel, {
+    delay: 500,
+    leading: true,
+})
+
+appWindow.onScaleChanged(() => locatePanel())
 
 listen(
     "tray-icon-click",
@@ -48,21 +70,7 @@ listen(
         if (await appWindow.isVisible()) {
             await appWindow.hide()
         } else {
-            const cornerPosition = await invoke<RawPosition>("get_workarea_corner", {
-                position: clickPosition,
-            })
-            let { x: right, y: bottom } = new PhysicalPosition(
-                cornerPosition.x,
-                cornerPosition.y,
-            ).toLogical(await appWindow.scaleFactor())
-            right -= 12
-            bottom -= 12
-            const { width, height } = panelState
-            const windowPosition = new LogicalPosition(
-                right - width,
-                bottom - height,
-            )
-            await appWindow.setPosition(windowPosition)
+            await locatePanel(clickPosition)
             await appWindow.show()
             await appWindow.setFocus()
             await invoke("refresh_mica")
