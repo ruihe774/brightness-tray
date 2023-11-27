@@ -1,6 +1,7 @@
 import { createApp } from "vue"
 import monitorManager from "./monitor"
 import BrightnessPanel from "./components/BrightnessPanel.vue"
+import "./wm"
 import "./style.global.sass"
 
 createApp(BrightnessPanel).mount("#root")
