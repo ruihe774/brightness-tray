@@ -30,7 +30,7 @@ jobs:
     - run: cargo check --release
       working-directory: src-tauri
       name: Check Rust
-    - run: cargo clippy
+    - run: cargo clippy --release
       working-directory: src-tauri
       name: Clippy Rust
     - run: cargo fmt --check
