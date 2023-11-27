@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "check": "tsc",
-    "fmt": "prettier -w src"
+    "fmt": "prettier -w src",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@tauri-apps/api": "1.5.x",
@@ -15,12 +16,17 @@
     "vue": "3.x"
   },
   "devDependencies": {
+    "@rushstack/eslint-patch": "1.x",
     "@types/lodash-es": "4.x",
     "@vitejs/plugin-vue": "4.x",
+    "@vue/eslint-config-prettier": "8.x",
+    "@vue/eslint-config-typescript": "12.x",
+    "eslint": "8.x",
+    "eslint-plugin-vue": "9.x",
     "prettier": "3.x",
     "rollup-plugin-visualizer": "5.x",
     "sass": "^1.69.0",
-    "typescript": "5.x",
+    "typescript": "5.2.x",
     "vite": "4.x"
   }
 }
