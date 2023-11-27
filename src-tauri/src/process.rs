@@ -86,11 +86,11 @@ pub fn ensure_windows_version() {
                 MB_ABORTRETRYIGNORE | MB_ICONWARNING,
             )
         };
-        return match r {
+        match r {
             IDABORT => exit(0),
             IDRETRY => ensure_windows_version(),
             IDIGNORE => (),
             _ => unreachable!(),
-        };
+        }
     }
 }
