@@ -1,0 +1,38 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  check:
+    runs-on: windows-2022
+    steps:
+    - run: git config --global core.autocrlf false
+      name: Disable autocrlf
+    - uses: actions/checkout@v4
+      name: Checkout
+    - uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+        check-latest: true
+        cache: npm
+      name: Setup Node
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+      name: Setup Rust
+    - run: npm ci
+      name: Install NPM dependencies
+    - run: npm run check
+      name: Check TS
+    - run: npm run lint
+      name: Lint JS/TS
+    - run: npx prettier --check src
+      name: Check JS/TS format
+    - run: cargo check
+      working-directory: src-tauri
+      name: Check Rust
+    - run: cargo clippy
+      working-directory: src-tauri
+      name: Clippy Rust
+    - run: cargo fmt --check
+      working-directory: src-tauri
+      name: Check Rust format
