@@ -8,7 +8,8 @@
     "build": "vite build",
     "check": "tsc",
     "fmt": "prettier -w src",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "devtools": "vue-devtools"
   },
   "dependencies": {
     "@tauri-apps/api": "1.5.x",
@@ -19,6 +20,7 @@
     "@rushstack/eslint-patch": "1.x",
     "@types/lodash-es": "4.x",
     "@vitejs/plugin-vue": "4.x",
+    "@vue/devtools": "6.x",
     "@vue/eslint-config-prettier": "8.x",
     "@vue/eslint-config-typescript": "12.x",
     "eslint": "8.x",
