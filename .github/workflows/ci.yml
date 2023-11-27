@@ -27,7 +27,7 @@ jobs:
       name: Lint JS/TS
     - run: npx prettier --check src
       name: Check JS/TS format
-    - run: cargo check
+    - run: cargo check --release
       working-directory: src-tauri
       name: Check Rust
     - run: cargo clippy
@@ -36,3 +36,37 @@ jobs:
     - run: cargo fmt --check
       working-directory: src-tauri
       name: Check Rust format
+
+  build:
+    runs-on: windows-2022
+    steps:
+    - run: git config --global core.autocrlf false
+      name: Disable autocrlf
+    - uses: actions/checkout@v4
+      name: Checkout
+    - uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+        sdk: 10.0.22621.0
+      name: Setup MSVC
+    - uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+        check-latest: true
+        cache: npm
+      name: Setup Node
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable-i686-pc-windows-msvc
+      name: Setup Rust
+    - run: npm ci
+      name: Install NPM dependencies
+    - run: cargo install tauri-cli --profile dev
+      name: Install Tauri CLI
+    - run: cargo tauri build
+      name: Build
+    - uses: actions/upload-artifact@v3
+      with:
+        name: artifact
+        path: src-tauri/target/release/brightness-tray.exe
+      name: Upload artifact
