@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { invoke } from "@tauri-apps/api/tauri"
-import { computed, ref } from "vue"
+import { reactive } from "vue"
 import { watchDelayed } from "../util"
 import panelState from "../wm.js"
 
@@ -9,38 +9,26 @@ interface Color {
     g: number
     b: number
 }
+type Colors = { [key: string]: Color | undefined }
 
-interface AccentColors {
-    accent: Color
-    accentDark1: Color
-    accentDark2: Color
-    accentDark3: Color
-    accentLight1: Color
-    accentLight2: Color
-    accentLight3: Color
-    background: Color
-    foreground: Color
-}
-
-const accents = ref<AccentColors>()
+const colors = reactive<Colors>({})
 
 watchDelayed(
     () => panelState.focused,
     async _focused => {
-        accents.value = await invoke<AccentColors>("get_accent_colors")
+        Object.assign(colors, await invoke<Colors>("get_accent_colors"))
     },
     { delay: 1000, immediate: true, leading: true },
 )
 
-const colors = computed(() => {
-    const colors: { [key: string]: string } = {}
-    if (accents.value) {
-        for (const [name, { r, g, b }] of Object.entries(accents.value)) {
-            colors[name] = `rgb(${r},${g},${b})`
-        }
+function c2s(color: Color | undefined): string {
+    try {
+        const { r, g, b } = color!
+        return `rgb(${r},${g},${b})`
+    } catch {
+        return "initial"
     }
-    return colors
-})
+}
 </script>
 
 <template>
@@ -51,13 +39,13 @@ const colors = computed(() => {
 
 <style scoped lang="sass">
 .style-root
-    --accent: v-bind(colors.accent)
-    --accent-dark1: v-bind(colors.accentDark1)
-    --accent-dark2: v-bind(colors.accentDark2)
-    --accent-dark3: v-bind(colors.accentDark3)
-    --accent-light1: v-bind(colors.accentLight1)
-    --accent-light2: v-bind(colors.accentLight2)
-    --accent-light3: v-bind(colors.accentLight3)
-    --background: v-bind(colors.background)
-    --foreground: v-bind(colors.foreground)
+    --accent: v-bind(c2s(colors.accent))
+    --accent-dark1: v-bind(c2s(colors.accentDark1))
+    --accent-dark2: v-bind(c2s(colors.accentDark2))
+    --accent-dark3: v-bind(c2s(colors.accentDark3))
+    --accent-light1: v-bind(c2s(colors.accentLight1))
+    --accent-light2: v-bind(c2s(colors.accentLight2))
+    --accent-light3: v-bind(c2s(colors.accentLight3))
+    --background: v-bind(c2s(colors.background))
+    --foreground: v-bind(c2s(colors.foreground))
 </style>

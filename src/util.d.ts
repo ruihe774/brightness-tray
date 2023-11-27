@@ -1,4 +1,9 @@
-import { WatchCallback, WatchOptions, WatchStopHandle, WatchSource } from "vue"
+import type {
+    WatchCallback,
+    WatchOptions,
+    WatchStopHandle,
+    WatchSource,
+} from "vue"
 
 declare interface WatchDelayedOptions<Immediate>
     extends WatchOptions<Immediate> {

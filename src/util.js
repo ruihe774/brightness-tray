@@ -2,7 +2,7 @@ import { watch } from "vue"
 import { debounce } from "lodash-es"
 
 export function watchDelayed(source, cb, options) {
-    if (typeof options == "number") {
+    if (typeof options != "object") {
         options = {
             delay: options,
         }
