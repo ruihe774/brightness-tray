@@ -6,6 +6,9 @@ import FeatureSlider from "./FeatureSlider.vue"
 import sheet from "../style.module.sass"
 
 export default defineComponent({
+    components: {
+        FeatureSlider,
+    },
     props: {
         monitorId: {
             type: String,
@@ -28,7 +31,9 @@ export default defineComponent({
             try {
                 return monitorManager.getFeature(this.monitorId, "powerstate")
                     .value
-            } catch {}
+            } catch {
+                return void 0
+            }
         },
     },
     methods: {
@@ -39,9 +44,6 @@ export default defineComponent({
                 Math.min(settings.ddcPowerOffValue, this.powerState!.maximum),
             )
         },
-    },
-    components: {
-        FeatureSlider,
     },
 })
 </script>
@@ -89,13 +91,13 @@ export default defineComponent({
                 sheet.stretchItems,
             ]"
         >
-            <template v-for="{ name, value } in monitor.features">
+            <template v-for="{ name: feature, value } in monitor.features">
                 <li
-                    v-if="name != 'powerstate' && value.maximum"
-                    :key="name"
+                    v-if="feature != 'powerstate' && value.maximum"
+                    :key="feature"
                     :class="sheet.resetSpacing"
                 >
-                    <FeatureSlider :monitorId="monitorId" :feature="name" />
+                    <FeatureSlider :monitor-id="monitorId" :feature="feature" />
                 </li>
             </template>
         </ul>

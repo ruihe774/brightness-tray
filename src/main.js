@@ -1,9 +1,9 @@
 import { createApp } from "vue"
 import monitorManager from "./monitor"
-import Panel from "./components/Panel.vue"
+import BrightnessPanel from "./components/BrightnessPanel.vue"
 import "./style.global.sass"
 
-createApp(Panel).mount("#root")
+createApp(BrightnessPanel).mount("#root")
 
 monitorManager.refreshMonitors()
 

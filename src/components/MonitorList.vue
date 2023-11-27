@@ -8,7 +8,7 @@ const { monitors } = monitorManager
 <template>
     <ul :class="[sheet.resetSpacing, sheet.verticalFlex, sheet.stretchItems]">
         <li v-for="{ id } in monitors" :key="id" :class="sheet.resetSpacing">
-            <MonitorItem :monitorId="id" />
+            <MonitorItem :monitor-id="id" />
         </li>
     </ul>
 </template>

@@ -87,10 +87,10 @@ export default defineComponent({
             min="0"
             :max="maximum"
             :value="current"
-            @input="handleInput"
-            @wheel="handleWheel"
             :class="[sheet.grow, sheet.slider]"
             :style="`--slider-value: ${(current / maximum) * 100}%`"
+            @input="handleInput"
+            @wheel="handleWheel"
         />
         <input
             type="number"
@@ -98,11 +98,11 @@ export default defineComponent({
             min="0"
             :max="maximum"
             :value="current"
-            @input="handleInput"
-            @wheel.prevent="handleWheel"
             role="status"
             :class="[sheet.borderlessNumber, sheet.titleFont]"
             style="width: 1.7em; text-align: center; margin-inline-start: 0.5em"
+            @input="handleInput"
+            @wheel.prevent="handleWheel"
         />
     </label>
 </template>

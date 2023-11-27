@@ -15,7 +15,7 @@ const colors = reactive<Colors>({})
 
 watchDelayed(
     () => panelState.focused,
-    async _focused => {
+    async () => {
         Object.assign(colors, await invoke<Colors>("get_accent_colors"))
     },
     { delay: 1000, immediate: true, leading: true },
