@@ -24,7 +24,6 @@
     "eslint": "8.x",
     "eslint-plugin-vue": "9.x",
     "prettier": "3.x",
-    "rollup-plugin-visualizer": "5.x",
     "sass": "^1.69.0",
     "typescript": "5.2.x",
     "vite": "4.x"
