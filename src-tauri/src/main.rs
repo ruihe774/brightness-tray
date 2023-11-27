@@ -25,9 +25,6 @@ fn main() {
         .setup(move |app| {
             let panel = app.get_window("panel").unwrap();
             let app = panel.app_handle();
-
-            wm::enable_mica(&panel)?;
-
             app.state::<tray::TrayManager>()
                 .set_theme(&app.tray_handle(), panel.theme().ok());
             panel.on_window_event(move |event| {
@@ -36,7 +33,8 @@ fn main() {
                         .set_theme(&app.tray_handle(), Some(*theme));
                 }
             });
-
+            #[cfg(debug_assertions)]
+            panel.open_devtools();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -46,28 +44,17 @@ fn main() {
             monitors::get_monitor_feature,
             monitors::set_monitor_feature,
             colors::get_accent_colors,
+            wm::refresh_mica,
+            wm::get_workarea_corner,
         ])
         .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::LeftClick { position, .. } => {
-                let window = app.get_window("panel").unwrap();
-                if window.is_visible().unwrap_or_default() {
-                    window.hide().unwrap()
-                } else {
-                    wm::locate_panel(&window, &position);
-                    window.show().unwrap();
-                    wm::enable_mica(&window).unwrap();
-                    window.set_focus().unwrap();
-                }
+                app.emit_all("tray-icon-click", position).unwrap();
             }
             SystemTrayEvent::MenuItemClick { id, .. } if id == "quit" => {
                 app.exit(0);
             }
             _ => (),
-        })
-        .on_window_event(|e| {
-            if let WindowEvent::ThemeChanged(_) = e.event() {
-                wm::enable_mica(e.window()).unwrap();
-            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

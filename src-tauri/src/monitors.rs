@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::async_runtime::Mutex;
 use tauri::State;
 
-use crate::util::{error_to_string, JSResult};
+use crate::util::JSResult;
 
 #[derive(Debug)]
 pub struct MonitorManager(Mutex<BTreeMap<String, Monitor>>);
@@ -39,7 +39,7 @@ fn get_monitor_by_id<'a>(
 ) -> JSResult<&'a Monitor> {
     monitors
         .get(id)
-        .ok_or_else(|| format!("no such monitor: '{id}'"))
+        .ok_or_else(|| format!("no such monitor: '{id}'").into())
 }
 
 #[tauri::command]
@@ -64,7 +64,7 @@ fn feature_from_string(mut feature_name: String) -> JSResult<Feature> {
         "brightness" => Feature::Brightness,
         "volume" => Feature::Volume,
         "powerstate" => Feature::PowerState,
-        _ => return Err(format!("invalid feature name: '{feature_name}'")),
+        _ => return Err(format!("invalid feature name: '{feature_name}'").into()),
     })
 }
 
@@ -83,10 +83,8 @@ pub async fn get_monitor_feature(
     let monitors = monitors.0.lock().await;
     let monitor = get_monitor_by_id(&monitors, &id)?;
     let feature = feature_from_string(feature)?;
-    match monitor.get_feature(feature) {
-        Ok(monitor::Reply { current, maximum }) => Ok(Reply { current, maximum }),
-        Err(e) => Err(error_to_string(e)),
-    }
+    let monitor::Reply { current, maximum } = monitor.get_feature(feature)?;
+    Ok(Reply { current, maximum })
 }
 
 #[tauri::command]
@@ -99,5 +97,5 @@ pub async fn set_monitor_feature(
     let monitors = monitors.0.lock().await;
     let monitor = get_monitor_by_id(&monitors, &id)?;
     let feature = feature_from_string(feature)?;
-    monitor.set_feature(feature, value).map_err(error_to_string)
+    Ok(monitor.set_feature(feature, value)?)
 }

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use windows::UI;
 use windows::UI::ViewManagement::{UIColorType, UISettings};
 
-use crate::util::{error_to_string, JSResult};
+use crate::util::JSResult;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Color {
@@ -27,14 +27,12 @@ pub struct AccentColors {
 
 #[tauri::command]
 pub fn get_accent_colors() -> JSResult<AccentColors> {
-    let settings = UISettings::new().map_err(error_to_string)?;
+    let settings = UISettings::new()?;
 
-    let get_color = |color_type| match settings.GetColorValue(color_type) {
-        Ok(UI::Color { R, G, B, A }) => {
-            debug_assert!(A == 255);
-            Ok(Color { r: R, g: G, b: B })
-        }
-        Err(e) => Err(error_to_string(e)),
+    let get_color = |color_type| -> JSResult<Color> {
+        let UI::Color { R, G, B, A } = settings.GetColorValue(color_type)?;
+        debug_assert_eq!(A, 255);
+        Ok(Color { r: R, g: G, b: B })
     };
 
     Ok(AccentColors {

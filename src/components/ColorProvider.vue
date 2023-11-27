@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { invoke } from "@tauri-apps/api/tauri"
+import { invoke } from "@tauri-apps/api"
 import { reactive } from "vue"
 import { watchDelayed } from "../util"
 import panelState from "../wm.js"

@@ -12,7 +12,10 @@
   "tauri": {
     "allowlist": {
       "window": {
+        "setFocus": true,
+        "setPosition": true,
         "setSize": true,
+        "show": true,
         "hide": true
       }
     },
