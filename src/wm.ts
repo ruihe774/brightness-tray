@@ -32,7 +32,10 @@ interface RawPosition {
     y: number
 }
 
-async function locatePanel(positionInMonitor?: RawPosition) {
+async function locatePanel(
+    positionInMonitor?: RawPosition,
+    flyIn?: boolean,
+): Promise<Animation | undefined> {
     const anchorPosition =
         positionInMonitor ?? (await appWindow.innerPosition())
     const windowSize = new LogicalSize(
@@ -53,8 +56,59 @@ async function locatePanel(positionInMonitor?: RawPosition) {
     right -= 12
     bottom -= 12
     const windowPosition = new LogicalPosition(right - width, bottom - height)
-    await appWindow.setPosition(windowPosition)
+    const { x: left, y: top } = windowPosition
+    let animation: Animation | undefined
+    if (flyIn) {
+        const startPosition = new LogicalPosition(left, top + height)
+        animation = fly(startPosition, windowPosition, "ease-out")
+    } else {
+        await appWindow.setPosition(windowPosition)
+    }
     await appWindow.setSize(windowSize)
+    return animation
+}
+
+function fly(
+    startPosition: LogicalPosition,
+    endPosition: LogicalPosition,
+    easing?: string,
+): Animation {
+    const stub = document.createElement("div")
+    stub.style.position = "absolute"
+    stub.style.visibility = "hidden"
+    document.body.appendChild(stub)
+    const animation = stub.animate(
+        [
+            {
+                left: startPosition.x + "px",
+                top: startPosition.y + "px",
+            },
+            {
+                left: endPosition.x + "px",
+                top: endPosition.y + "px",
+            },
+        ],
+        {
+            duration: 100,
+            easing,
+        },
+    )
+    let finished = false
+    animation.onfinish = () => void (finished = true)
+    requestAnimationFrame(function updatePosition() {
+        if (finished) {
+            appWindow.setPosition(endPosition)
+            stub.remove()
+        } else {
+            animation.commitStyles()
+            const { left, top } = stub.style
+            appWindow.setPosition(
+                new LogicalPosition(parseFloat(left), parseFloat(top)),
+            )
+            requestAnimationFrame(updatePosition)
+        }
+    })
+    return animation
 }
 
 watchDelayed(() => (panelState.width, panelState.height, void 0), locatePanel, {
@@ -64,16 +118,32 @@ watchDelayed(() => (panelState.width, panelState.height, void 0), locatePanel, {
 
 appWindow.onScaleChanged(() => locatePanel())
 
+async function showWindow(clickPosition?: RawPosition) {
+    await locatePanel(clickPosition, true)
+    await appWindow.show()
+    await appWindow.setFocus()
+    await invoke("refresh_mica")
+}
+
+async function hideWindow() {
+    const windowPosition = (await appWindow.outerPosition()).toLogical(
+        await appWindow.scaleFactor(),
+    )
+    const endPosition = new LogicalPosition(
+        windowPosition.x,
+        windowPosition.y + panelState.height + 50,
+    )
+    await fly(windowPosition, endPosition, "ease-in").finished
+    await appWindow.hide()
+}
+
 listen(
     "tray-icon-click",
     async ({ payload: clickPosition }: Event<RawPosition>) => {
         if (await appWindow.isVisible()) {
-            await appWindow.hide()
+            await hideWindow()
         } else {
-            await locatePanel(clickPosition)
-            await appWindow.show()
-            await appWindow.setFocus()
-            await invoke("refresh_mica")
+            await showWindow(clickPosition)
         }
     },
 )
@@ -83,7 +153,7 @@ if (import.meta.env.PROD) {
         () => panelState.focused,
         focused => {
             if (!focused) {
-                appWindow.hide()
+                hideWindow()
             }
         },
         100,
