@@ -118,22 +118,28 @@ watchDelayed(() => (panelState.width, panelState.height, void 0), locatePanel, {
 
 appWindow.onScaleChanged(() => locatePanel())
 
+function preferReducedMotion(): boolean {
+    return matchMedia("(prefers-reduced-motion)").matches
+}
+
 async function showWindow(clickPosition?: RawPosition) {
-    await locatePanel(clickPosition, true)
+    await locatePanel(clickPosition, !preferReducedMotion())
     await appWindow.show()
     await appWindow.setFocus()
     await invoke("refresh_mica")
 }
 
 async function hideWindow() {
-    const windowPosition = (await appWindow.outerPosition()).toLogical(
-        await appWindow.scaleFactor(),
-    )
-    const endPosition = new LogicalPosition(
-        windowPosition.x,
-        windowPosition.y + panelState.height + 50,
-    )
-    await fly(windowPosition, endPosition, "ease-in").finished
+    if (!preferReducedMotion()) {
+        const windowPosition = (await appWindow.outerPosition()).toLogical(
+            await appWindow.scaleFactor(),
+        )
+        const endPosition = new LogicalPosition(
+            windowPosition.x,
+            windowPosition.y + panelState.height + 50,
+        )
+        await fly(windowPosition, endPosition, "ease-in").finished
+    }
     await appWindow.hide()
 }
 
