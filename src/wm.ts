@@ -127,12 +127,19 @@ function fly(
     return animation;
 }
 
-watchDelayed(() => void (panelState.width, panelState.height), locatePanel, {
-    delay: 500,
-    leading: true,
-});
+watchDelayed(
+    () => [panelState.width, panelState.height],
+    () => locatePanel(),
+    {
+        delay: 500,
+        leading: true,
+    },
+);
 
-watch(() => void panelState.scaleFactor, locatePanel);
+watch(
+    () => panelState.scaleFactor,
+    () => locatePanel(),
+);
 
 function preferReducedMotion(): boolean {
     return matchMedia("(prefers-reduced-motion)").matches;
