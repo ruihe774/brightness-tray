@@ -68,6 +68,19 @@ async function locatePanel(
     return animation
 }
 
+CSS.registerProperty({
+    name: "--fly-animation-x",
+    syntax: "<number>",
+    inherits: false,
+    initialValue: "0",
+})
+CSS.registerProperty({
+    name: "--fly-animation-y",
+    syntax: "<number>",
+    inherits: false,
+    initialValue: "0",
+})
+
 function fly(
     startPosition: LogicalPosition,
     endPosition: LogicalPosition,
@@ -80,12 +93,12 @@ function fly(
     const animation = stub.animate(
         [
             {
-                left: startPosition.x + "px",
-                top: startPosition.y + "px",
+                "--fly-animation-x": startPosition.x,
+                "--fly-animation-y": startPosition.y,
             },
             {
-                left: endPosition.x + "px",
-                top: endPosition.y + "px",
+                "--fly-animation-x": endPosition.x,
+                "--fly-animation-y": endPosition.y,
             },
         ],
         {
@@ -101,9 +114,10 @@ function fly(
             stub.remove()
         } else {
             animation.commitStyles()
-            const { left, top } = stub.style
+            const left = stub.style.getPropertyValue("--fly-animation-x")
+            const top = stub.style.getPropertyValue("--fly-animation-y")
             appWindow.setPosition(
-                new LogicalPosition(parseFloat(left), parseFloat(top)),
+                new LogicalPosition(Number(left), Number(top)),
             )
             requestAnimationFrame(updatePosition)
         }
