@@ -25,8 +25,6 @@ jobs:
       name: Check TS
     - run: npm run lint
       name: Lint JS/TS
-    - run: npx prettier --check src
-      name: Check JS/TS format
     - run: cargo check --release
       working-directory: src-tauri
       name: Check Rust

@@ -7,4 +7,7 @@ module.exports = {
         "@vue/eslint-config-typescript/recommended",
         "@vue/eslint-config-prettier",
     ],
+    rules: {
+        "no-empty": ["error", { "allowEmptyCatch": true }]
+    }
 }

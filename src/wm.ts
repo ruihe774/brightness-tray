@@ -5,8 +5,8 @@ import { reactive, watch, watchEffect } from "vue";
 import { watchDelayed, watchThrottled } from "./watchers";
 
 const panelState = reactive({
-    width: 0,
-    height: 0,
+    width: 350,
+    height: 200,
     focused: false,
     scaleFactor: await appWindow.scaleFactor(),
     theme: await appWindow.theme(),
@@ -39,8 +39,9 @@ interface RawPosition {
 
 async function locatePanel(
     positionInMonitor?: RawPosition,
-    flyIn?: boolean,
-): Promise<Animation | undefined> {
+    animated?: boolean,
+    oldSize?: { width: number; height: number },
+): Promise<Animation[]> {
     const anchorPosition = positionInMonitor ?? (await appWindow.innerPosition());
     const windowSize = new LogicalSize(
         Math.max(300, panelState.width),
@@ -61,35 +62,43 @@ async function locatePanel(
     bottom -= 12;
     const windowPosition = new LogicalPosition(right - width, bottom - height);
     const { x: left, y: top } = windowPosition;
-    let animation: Animation | undefined;
-    if (flyIn) {
-        const startPosition = new LogicalPosition(left, top + height);
-        animation = fly(startPosition, windowPosition, "ease-out");
+    const animations: Animation[] = [];
+    if (animated) {
+        const startPosition = new LogicalPosition(left, top + height - (oldSize?.height ?? 0));
+        animations.push(animateWindow(startPosition, windowPosition, "ease-out"));
     } else {
         await appWindow.setPosition(windowPosition);
     }
     await appWindow.setSize(windowSize);
-    return animation;
+    return animations;
 }
 
 CSS.registerProperty({
-    name: "--fly-animation-x",
+    name: "--window-animation-x",
     syntax: "<number>",
     inherits: false,
     initialValue: "0",
 });
 CSS.registerProperty({
-    name: "--fly-animation-y",
+    name: "--window-animation-y",
     syntax: "<number>",
     inherits: false,
     initialValue: "0",
 });
 
-function fly(
-    startPosition: LogicalPosition,
-    endPosition: LogicalPosition,
-    easing?: string,
-): Animation {
+function animateWindow(start: LogicalPosition, end: LogicalPosition, easing?: string): Animation;
+function animateWindow(start: LogicalSize, end: LogicalSize, easing?: string): Animation;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function animateWindow(start: any, end: any, easing?: string): Animation {
+    const kind: "fly" | "resize" = "width" in start ? "resize" : "fly";
+    const rawStart = {
+        x: (start.x ?? start.width) as number,
+        y: (start.y ?? start.height) as number,
+    };
+    const rawEnd = {
+        x: (end.x ?? end.width) as number,
+        y: (end.y ?? end.height) as number,
+    };
     const stub = document.createElement("div");
     stub.style.position = "absolute";
     stub.style.visibility = "hidden";
@@ -97,12 +106,12 @@ function fly(
     const animation = stub.animate(
         [
             {
-                "--fly-animation-x": startPosition.x,
-                "--fly-animation-y": startPosition.y,
+                "--window-animation-x": rawStart.x,
+                "--window-animation-y": rawStart.y,
             },
             {
-                "--fly-animation-x": endPosition.x,
-                "--fly-animation-y": endPosition.y,
+                "--window-animation-x": rawEnd.x,
+                "--window-animation-y": rawEnd.y,
             },
         ],
         {
@@ -114,24 +123,32 @@ function fly(
     animation.onfinish = () => void (finished = true);
     requestAnimationFrame(function updatePosition() {
         if (finished) {
-            appWindow.setPosition(endPosition);
+            update(rawEnd);
             stub.remove();
         } else {
             animation.commitStyles();
-            const left = stub.style.getPropertyValue("--fly-animation-x");
-            const top = stub.style.getPropertyValue("--fly-animation-y");
-            appWindow.setPosition(new LogicalPosition(Number(left), Number(top)));
+            update({
+                x: Number(stub.style.getPropertyValue("--window-animation-x")),
+                y: Number(stub.style.getPropertyValue("--window-animation-y")),
+            });
             requestAnimationFrame(updatePosition);
         }
     });
+    function update(state: RawPosition) {
+        if (kind == "fly") {
+            appWindow.setPosition(new LogicalPosition(state.x, state.y));
+        } else {
+            appWindow.setSize(new LogicalSize(state.x, state.y));
+        }
+    }
     return animation;
 }
 
 watchThrottled(
-    () => [panelState.width, panelState.height],
-    () => locatePanel(),
+    () => ({ width: panelState.width, height: panelState.height }),
+    (_new, old) => locatePanel(void 0, !preferReducedMotion(), old),
     {
-        throttle: 500,
+        throttle: 100,
         trailing: true,
     },
 );
@@ -161,7 +178,7 @@ async function hideWindow() {
             windowPosition.x,
             windowPosition.y + panelState.height + 50,
         );
-        await fly(windowPosition, endPosition, "ease-in").finished;
+        await animateWindow(windowPosition, endPosition, "ease-in").finished;
     }
     await appWindow.hide();
 }
