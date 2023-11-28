@@ -2,23 +2,23 @@ use std::collections::BTreeMap;
 
 use monitor::{Feature, Monitor};
 use serde::{Deserialize, Serialize};
-use tauri::async_runtime::Mutex;
+use tauri::async_runtime::RwLock;
 use tauri::State;
 
 use crate::util::JSResult;
 
 #[derive(Debug)]
-pub struct MonitorManager(Mutex<BTreeMap<String, Monitor>>);
+pub struct MonitorManager(RwLock<BTreeMap<String, Monitor>>);
 
 impl MonitorManager {
     pub const fn new() -> MonitorManager {
-        MonitorManager(Mutex::const_new(BTreeMap::new()))
+        MonitorManager(RwLock::const_new(BTreeMap::new()))
     }
 }
 
 #[tauri::command]
 pub async fn refresh_monitors(monitors: State<'_, MonitorManager>) -> JSResult<()> {
-    let mut monitors = monitors.0.lock().await;
+    let mut monitors = monitors.0.write().await;
     monitors.clear();
     for monitor in monitor::get_monitors() {
         let pv = monitors.insert(monitor.id.to_string_lossy().into_owned(), monitor);
@@ -29,7 +29,7 @@ pub async fn refresh_monitors(monitors: State<'_, MonitorManager>) -> JSResult<(
 
 #[tauri::command]
 pub async fn get_monitors(monitors: State<'_, MonitorManager>) -> JSResult<Vec<String>> {
-    let monitors = monitors.0.lock().await;
+    let monitors = monitors.0.read().await;
     Ok(monitors.keys().map(String::clone).collect())
 }
 
@@ -47,12 +47,10 @@ pub async fn get_monitor_user_friendly_name(
     monitors: State<'_, MonitorManager>,
     id: String,
 ) -> JSResult<Option<String>> {
-    let monitors = monitors.0.lock().await;
+    let monitors = monitors.0.read().await;
     let monitor = get_monitor_by_id(&monitors, &id)?;
     Ok(monitor
-        .get_user_friendly_name()
-        .ok()
-        .flatten()
+        .get_user_friendly_name()?
         .map(|s| s.to_string_lossy().into_owned()))
 }
 
@@ -80,7 +78,7 @@ pub async fn get_monitor_feature(
     id: String,
     feature: String,
 ) -> JSResult<Reply> {
-    let monitors = monitors.0.lock().await;
+    let monitors = monitors.0.read().await;
     let monitor = get_monitor_by_id(&monitors, &id)?;
     let feature = feature_from_string(feature)?;
     let monitor::Reply { current, maximum } = monitor.get_feature(feature)?;
@@ -94,7 +92,7 @@ pub async fn set_monitor_feature(
     feature: String,
     value: u32,
 ) -> JSResult<()> {
-    let monitors = monitors.0.lock().await;
+    let monitors = monitors.0.read().await;
     let monitor = get_monitor_by_id(&monitors, &id)?;
     let feature = feature_from_string(feature)?;
     Ok(monitor.set_feature(feature, value)?)

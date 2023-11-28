@@ -28,8 +28,14 @@ export default defineComponent({
         };
     },
     computed: {
+        featureObject() {
+            return monitorManager.getFeature(this.monitorId, this.feature);
+        },
+        readonly() {
+            return this.featureObject.readonly;
+        },
         featureValue() {
-            return monitorManager.getFeature(this.monitorId, this.feature).value;
+            return this.featureObject.value;
         },
         current() {
             return this.featureValue.current;
@@ -47,7 +53,7 @@ export default defineComponent({
             const target = e.target! as HTMLInputElement;
             if (target.validity.valid) {
                 const value = Number(target.value);
-                monitorManager.setFeature(this.monitorId, this.feature, value);
+                monitorManager.updateFeature(this.monitorId, this.feature, value);
             }
         },
         handleWheel(event: Event) {
@@ -56,7 +62,7 @@ export default defineComponent({
             if (e.deltaMode == WheelEvent.DOM_DELTA_PIXEL) {
                 const offset = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : -e.deltaY;
                 const current = Number(target.value);
-                monitorManager.setFeature(
+                monitorManager.updateFeature(
                     this.monitorId,
                     this.feature,
                     Math.max(0, Math.min(this.maximum, Math.round(current + offset * 0.01))),
@@ -78,6 +84,7 @@ export default defineComponent({
             min="0"
             :max="maximum"
             :value="current"
+            :disabled="readonly"
             :class="[sheet.grow, sheet.slider]"
             :style="`--slider-value: ${(current / maximum) * 100}%`"
             @input="handleInput"
@@ -85,11 +92,12 @@ export default defineComponent({
         />
         <input
             type="number"
+            role="status"
             step="1"
             min="0"
             :max="maximum"
             :value="current"
-            role="status"
+            :disabled="readonly"
             :class="[sheet.borderlessNumber, sheet.titleFont]"
             style="width: 1.7em; text-align: center; margin-inline-start: 0.5em"
             @input="handleInput"

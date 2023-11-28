@@ -12,6 +12,7 @@ export interface Feature {
     name: string;
     value: Reply;
     syncing: boolean;
+    readonly: boolean;
 }
 
 export interface Monitor {
@@ -26,70 +27,92 @@ function timeout(millis: number): Promise<undefined> {
     });
 }
 
-async function getFeatures(
-    id: string,
-    featureNames: string[],
-    silent?: boolean,
-): Promise<Feature[]> {
-    const featureTestTime = 200;
-    const features: Feature[] = [];
-    for (let i = 0; i < featureNames.length; ++i) {
-        if (i) {
-            await timeout(featureTestTime);
-        }
-        const name = featureNames[i];
-        let value: Reply;
-        if (silent) {
-            try {
-                value = await invoke<Reply>("get_monitor_feature", {
-                    id,
-                    feature: name,
-                });
-            } catch {
-                continue;
-            }
-        } else {
-            value = await invoke<Reply>("get_monitor_feature", {
-                id,
-                feature: name,
-            });
-        }
-        features.push({ name, value, syncing: false });
-    }
-    return features;
-}
-
 export class Manager {
     readonly monitors: Monitor[] = reactive([]);
+    private refreshing: boolean = false;
 
-    async refreshMonitors() {
+    private async doRefresh(): Promise<void> {
         await invoke("refresh_monitors");
-        const monitor_ids = await invoke<string[]>("get_monitors");
-        const monitor_names = await Promise.all(
-            monitor_ids.map((id) => {
-                try {
-                    return invoke<string | null>("get_monitor_user_friendly_name", { id });
-                } catch {
-                    return null;
-                }
-            }),
-        );
-        const monitor_features = await Promise.all(
-            monitor_ids.map((id) =>
-                getFeatures(
-                    id,
-                    ["luminance", "contrast", "brightness", "volume", "powerstate"],
-                    true,
-                ),
-            ),
-        );
+        const monitorIds = await invoke<string[]>("get_monitors");
+        const monitorMap = new Map(this.monitors.map((monitor) => [monitor.id, monitor]));
         this.monitors.splice(0);
-        for (let i = 0; i < monitor_ids.length; ++i) {
-            this.monitors.push({
-                id: monitor_ids[i],
-                name: monitor_names[i],
-                features: monitor_features[i],
-            });
+        for (const id of monitorIds) {
+            this.monitors.push(
+                monitorMap.get(id) ?? {
+                    id,
+                    name: null,
+                    features: [],
+                },
+            );
+        }
+        const pool: Promise<void>[] = [];
+        for (const monitor of this.monitors) {
+            if (monitor.name == null) {
+                pool.push(
+                    (async () => {
+                        try {
+                            monitor.name = await invoke<string | null>(
+                                "get_monitor_user_friendly_name",
+                                { id: monitor.id },
+                            );
+                        } catch {}
+                    })(),
+                );
+            }
+        }
+        for (const monitor of this.monitors) {
+            pool.push(
+                (async () => {
+                    const featureTestTime = 200;
+                    const featureNames = monitor.features.length
+                        ? monitor.features.map((feature) => feature.name)
+                        : ["luminance", "contrast", "brightness", "volume", "powerstate"];
+                    let first = true;
+                    for (const name of featureNames) {
+                        if (!first) {
+                            await timeout(featureTestTime);
+                        }
+                        let value: Reply | undefined;
+                        try {
+                            value = await invoke<Reply>("get_monitor_feature", {
+                                id: monitor.id,
+                                feature: name,
+                            });
+                        } catch {}
+                        const idx = monitor.features.findIndex((feature) => feature.name == name);
+                        if (value) {
+                            const item = monitor.features[idx];
+                            if (item) {
+                                if (!item.syncing) {
+                                    item.value = value;
+                                }
+                            } else {
+                                monitor.features.push({
+                                    name,
+                                    value,
+                                    syncing: false,
+                                    readonly: false,
+                                });
+                            }
+                        } else if (idx != -1) {
+                            monitor.features.splice(idx, 1);
+                        }
+                        first = false;
+                    }
+                })(),
+            );
+        }
+        await Promise.allSettled(pool);
+    }
+
+    async refresh(): Promise<void> {
+        if (!this.refreshing) {
+            this.refreshing = true;
+            try {
+                await this.doRefresh();
+            } finally {
+                this.refreshing = false;
+            }
         }
     }
 
@@ -101,18 +124,6 @@ export class Manager {
         throw new Error(`no such monitor: '${id}'`);
     }
 
-    async refreshFeature(id: string, name: string) {
-        const monitor = this.getMonitor(id);
-        const features = await getFeatures(id, [name]);
-        const feature = features[0];
-        const idx = monitor.features.findIndex((f) => f.name == feature.name);
-        if (idx == -1) {
-            monitor.features.push(feature);
-        } else {
-            monitor.features[idx] = feature;
-        }
-    }
-
     getFeature(id: string, name: string): Feature {
         const monitor = this.getMonitor(id);
         const feature = monitor.features.find((f) => f.name == name);
@@ -122,7 +133,7 @@ export class Manager {
         throw new Error(`monitor '${id}' has no such feature: '${name}'`);
     }
 
-    setFeature(id: string, name: string, value: number) {
+    updateFeature(id: string, name: string, value: number): void {
         const feature = this.getFeature(id, name);
         feature.value.current = value;
         feature.syncing = true;
@@ -147,7 +158,8 @@ watch(
                                     feature: feature.name,
                                     value: feature.value.current,
                                 }).catch(() => {
-                                    monitorManager.refreshFeature(monitor.id, feature.name);
+                                    feature.readonly = true;
+                                    monitorManager.refresh();
                                 });
                             }
                         }

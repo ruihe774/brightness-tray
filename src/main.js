@@ -1,12 +1,19 @@
 import { createApp } from "vue";
+import { watchThrottled } from "./watchers";
 import monitorManager from "./monitor";
 import BrightnessPanel from "./components/BrightnessPanel.vue";
-import "./wm";
+import panelState from "./wm";
 import "./style.global.sass";
 
 createApp(BrightnessPanel).mount("#root");
 
-monitorManager.refreshMonitors();
+watchThrottled(
+    () => panelState.focused,
+    () => {
+        monitorManager.refresh();
+    },
+    { throttle: 10000, immediate: true },
+);
 
 if (import.meta.env.PROD) {
     document.addEventListener("contextmenu", (e) => e.preventDefault());
