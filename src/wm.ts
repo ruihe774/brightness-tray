@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api";
 import { listen, Event } from "@tauri-apps/api/event";
 import { LogicalPosition, LogicalSize, PhysicalPosition, appWindow } from "@tauri-apps/api/window";
 import { reactive, watch, watchEffect } from "vue";
-import { watchDelayed } from "./util";
+import { watchDelayed, watchThrottled } from "./watchers";
 
 const panelState = reactive({
     width: 0,
@@ -127,12 +127,12 @@ function fly(
     return animation;
 }
 
-watchDelayed(
+watchThrottled(
     () => [panelState.width, panelState.height],
     () => locatePanel(),
     {
-        delay: 500,
-        leading: true,
+        throttle: 500,
+        trailing: true,
     },
 );
 

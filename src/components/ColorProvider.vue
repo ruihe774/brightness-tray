@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { invoke } from "@tauri-apps/api";
 import { computed, reactive } from "vue";
-import { watchDelayed } from "../util";
-import panelState from "../wm.js";
+import { watchThrottled } from "../watchers";
+import panelState from "../wm";
 
 interface Color {
     r: number;
@@ -13,12 +13,12 @@ type Colors = { [key: string]: Color };
 
 const colors = reactive<Colors>({});
 
-watchDelayed(
+watchThrottled(
     () => panelState.focused,
     async () => {
         Object.assign(colors, await invoke<Colors>("get_accent_colors"));
     },
-    { delay: 1000, immediate: true, leading: true },
+    { throttle: 1000, immediate: true },
 );
 
 const style = computed(() => {
