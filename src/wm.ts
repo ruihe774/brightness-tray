@@ -21,7 +21,7 @@ const resizoObserver = new ResizeObserver(entries => {
     panelState.width = borderBox.inlineSize
     panelState.height = borderBox.blockSize
 })
-resizoObserver.observe(document.getElementsByTagName("html")[0])
+resizoObserver.observe(document.querySelector("html")!)
 
 appWindow.onFocusChanged(({ payload }) => {
     panelState.focused = payload

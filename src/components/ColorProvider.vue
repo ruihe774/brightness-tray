@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { invoke } from "@tauri-apps/api"
-import { reactive } from "vue"
+import { computed, reactive } from "vue"
 import { watchDelayed } from "../util"
 import panelState from "../wm.js"
 
@@ -9,7 +9,7 @@ interface Color {
     g: number
     b: number
 }
-type Colors = { [key: string]: Color | undefined }
+type Colors = { [key: string]: Color }
 
 const colors = reactive<Colors>({})
 
@@ -21,31 +21,21 @@ watchDelayed(
     { delay: 1000, immediate: true, leading: true },
 )
 
-function c2s(color: Color | undefined): string {
-    try {
-        const { r, g, b } = color!
-        return `rgb(${r},${g},${b})`
-    } catch {
-        return "initial"
+const style = computed(() => {
+    const style: string[] = []
+    for (const [name, { r, g, b }] of Object.entries(colors)) {
+        style.push(
+            `--${name
+                .replace(/([a-z])([A-Z])/g, "$1-$2")
+                .toLowerCase()}:rgb(${r},${g},${b})`,
+        )
     }
-}
+    return style.join(";")
+})
 </script>
 
 <template>
-    <div class="style-root">
+    <div :style="style">
         <slot />
     </div>
 </template>
-
-<style scoped lang="sass">
-.style-root
-    --accent: v-bind(c2s(colors.accent))
-    --accent-dark1: v-bind(c2s(colors.accentDark1))
-    --accent-dark2: v-bind(c2s(colors.accentDark2))
-    --accent-dark3: v-bind(c2s(colors.accentDark3))
-    --accent-light1: v-bind(c2s(colors.accentLight1))
-    --accent-light2: v-bind(c2s(colors.accentLight2))
-    --accent-light3: v-bind(c2s(colors.accentLight3))
-    --background: v-bind(c2s(colors.background))
-    --foreground: v-bind(c2s(colors.foreground))
-</style>
