@@ -68,12 +68,8 @@ export default defineComponent({
             </button>
         </div>
         <ul :class="[sheet.resetSpacing, sheet.verticalFlex, sheet.stretchItems]">
-            <template v-for="{ name: feature, value } in monitor.features">
-                <li
-                    v-if="feature != 'powerstate' && value.maximum"
-                    :key="feature"
-                    :class="sheet.resetSpacing"
-                >
+            <template v-for="{ name: feature, value } in monitor.features" :key="feature">
+                <li v-if="feature != 'powerstate' && value.maximum" :class="sheet.resetSpacing">
                     <FeatureSlider :monitor-id="monitorId" :feature="feature" />
                 </li>
             </template>
