@@ -134,7 +134,7 @@ function animateWindow(start: any, end: any, easing?: string): Animation {
             requestAnimationFrame(updatePosition);
         }
     });
-    function update(state: RawPosition) {
+    function update(state: RawPosition): void {
         if (kind == "fly") {
             appWindow.setPosition(new LogicalPosition(state.x, state.y));
         } else {
@@ -162,14 +162,14 @@ function preferReducedMotion(): boolean {
     return matchMedia("(prefers-reduced-motion)").matches;
 }
 
-async function showWindow(clickPosition?: RawPosition) {
+async function showWindow(clickPosition?: RawPosition): Promise<void> {
     await locatePanel(clickPosition, !preferReducedMotion());
     await appWindow.show();
     await appWindow.setFocus();
     await invoke("refresh_mica");
 }
 
-async function hideWindow() {
+async function hideWindow(): Promise<void> {
     if (!preferReducedMotion()) {
         const windowPosition = (await appWindow.outerPosition()).toLogical(
             await appWindow.scaleFactor(),

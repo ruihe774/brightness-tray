@@ -8,6 +8,7 @@ module.exports = {
         "@vue/eslint-config-prettier",
     ],
     rules: {
-        "no-empty": ["error", { "allowEmptyCatch": true }]
+        "no-empty": ["error", { allowEmptyCatch: true }],
+        "@typescript-eslint/explicit-function-return-type": ["error", { allowExpressions: true }],
     }
 }
