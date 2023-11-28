@@ -1,18 +1,12 @@
-import type {
-    WatchCallback,
-    WatchOptions,
-    WatchStopHandle,
-    WatchSource,
-} from "vue"
+import type { WatchCallback, WatchOptions, WatchStopHandle, WatchSource } from "vue";
 
-declare interface WatchDelayedOptions<Immediate>
-    extends WatchOptions<Immediate> {
-    delay?: number
-    trailing?: boolean
-    leading?: boolean
+declare interface WatchDelayedOptions<Immediate> extends WatchOptions<Immediate> {
+    delay?: number;
+    trailing?: boolean;
+    leading?: boolean;
 }
 
-type MultiWatchSources = (WatchSource<unknown> | object)[]
+type MultiWatchSources = (WatchSource<unknown> | object)[];
 
 type MapSources<T, Immediate> = {
     [K in keyof T]: T[K] extends WatchSource<infer V>
@@ -23,8 +17,8 @@ type MapSources<T, Immediate> = {
           ? Immediate extends true
               ? T[K] | undefined
               : T[K]
-          : never
-}
+          : never;
+};
 
 declare function watchDelayed<
     T extends MultiWatchSources,
@@ -33,7 +27,7 @@ declare function watchDelayed<
     sources: [...T],
     cb: WatchCallback<MapSources<T, false>, MapSources<T, Immediate>>,
     options?: WatchDelayedOptions<Immediate> | number,
-): WatchStopHandle
+): WatchStopHandle;
 
 declare function watchDelayed<
     T extends Readonly<MultiWatchSources>,
@@ -42,19 +36,16 @@ declare function watchDelayed<
     source: T,
     cb: WatchCallback<MapSources<T, false>, MapSources<T, Immediate>>,
     options?: WatchDelayedOptions<Immediate> | number,
-): WatchStopHandle
+): WatchStopHandle;
 
 declare function watchDelayed<T, Immediate extends Readonly<boolean> = false>(
     source: WatchSource<T>,
     cb: WatchCallback<T, Immediate extends true ? T | undefined : T>,
     options?: WatchDelayedOptions<Immediate> | number,
-): WatchStopHandle
+): WatchStopHandle;
 
-declare function watchDelayed<
-    T extends object,
-    Immediate extends Readonly<boolean> = false,
->(
+declare function watchDelayed<T extends object, Immediate extends Readonly<boolean> = false>(
     source: T,
     cb: WatchCallback<T, Immediate extends true ? T | undefined : T>,
     options?: WatchDelayedOptions<Immediate> | number,
-): WatchStopHandle
+): WatchStopHandle;

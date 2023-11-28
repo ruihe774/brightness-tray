@@ -1,71 +1,65 @@
-import { invoke } from "@tauri-apps/api"
-import { listen, Event } from "@tauri-apps/api/event"
-import {
-    LogicalPosition,
-    LogicalSize,
-    PhysicalPosition,
-    appWindow,
-} from "@tauri-apps/api/window"
-import { reactive } from "vue"
-import { watchDelayed } from "./util"
+import { invoke } from "@tauri-apps/api";
+import { listen, Event } from "@tauri-apps/api/event";
+import { LogicalPosition, LogicalSize, PhysicalPosition, appWindow } from "@tauri-apps/api/window";
+import { reactive } from "vue";
+import { watchDelayed } from "./util";
 
 const panelState = reactive({
     width: 0,
     height: 0,
     focused: false,
-})
+});
 
-const resizoObserver = new ResizeObserver(entries => {
-    const entry = entries[0]
-    const borderBox = entry.borderBoxSize[0]
-    panelState.width = borderBox.inlineSize
-    panelState.height = borderBox.blockSize
-})
-resizoObserver.observe(document.querySelector("html")!)
+const resizoObserver = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    const borderBox = entry.borderBoxSize[0];
+    panelState.width = borderBox.inlineSize;
+    panelState.height = borderBox.blockSize;
+});
+resizoObserver.observe(document.querySelector("html")!);
 
 appWindow.onFocusChanged(({ payload }) => {
-    panelState.focused = payload
-})
+    panelState.focused = payload;
+});
 
 interface RawPosition {
-    x: number
-    y: number
+    x: number;
+    y: number;
 }
 
 async function locatePanel(
     positionInMonitor?: RawPosition,
     flyIn?: boolean,
 ): Promise<Animation | undefined> {
-    const anchorPosition =
-        positionInMonitor ?? (await appWindow.innerPosition())
+    const anchorPosition = positionInMonitor ?? (await appWindow.innerPosition());
     const windowSize = new LogicalSize(
         Math.max(300, panelState.width),
         Math.max(50, panelState.height),
-    )
-    const { width, height } = windowSize
+    );
+    const { width, height } = windowSize;
     const cornerPosition = await invoke<RawPosition>("get_workarea_corner", {
         position: {
             x: anchorPosition.x,
             y: anchorPosition.y,
         },
-    })
+    });
     let { x: right, y: bottom } = new PhysicalPosition(
         cornerPosition.x,
         cornerPosition.y,
-    ).toLogical(await appWindow.scaleFactor())
-    right -= 12
-    bottom -= 12
-    const windowPosition = new LogicalPosition(right - width, bottom - height)
-    const { x: left, y: top } = windowPosition
-    let animation: Animation | undefined
+    ).toLogical(await appWindow.scaleFactor());
+    right -= 12;
+    bottom -= 12;
+    const windowPosition = new LogicalPosition(right - width, bottom - height);
+    const { x: left, y: top } = windowPosition;
+    let animation: Animation | undefined;
     if (flyIn) {
-        const startPosition = new LogicalPosition(left, top + height)
-        animation = fly(startPosition, windowPosition, "ease-out")
+        const startPosition = new LogicalPosition(left, top + height);
+        animation = fly(startPosition, windowPosition, "ease-out");
     } else {
-        await appWindow.setPosition(windowPosition)
+        await appWindow.setPosition(windowPosition);
     }
-    await appWindow.setSize(windowSize)
-    return animation
+    await appWindow.setSize(windowSize);
+    return animation;
 }
 
 CSS.registerProperty({
@@ -73,23 +67,23 @@ CSS.registerProperty({
     syntax: "<number>",
     inherits: false,
     initialValue: "0",
-})
+});
 CSS.registerProperty({
     name: "--fly-animation-y",
     syntax: "<number>",
     inherits: false,
     initialValue: "0",
-})
+});
 
 function fly(
     startPosition: LogicalPosition,
     endPosition: LogicalPosition,
     easing?: string,
 ): Animation {
-    const stub = document.createElement("div")
-    stub.style.position = "absolute"
-    stub.style.visibility = "hidden"
-    document.body.appendChild(stub)
+    const stub = document.createElement("div");
+    stub.style.position = "absolute";
+    stub.style.visibility = "hidden";
+    document.body.appendChild(stub);
     const animation = stub.animate(
         [
             {
@@ -105,79 +99,74 @@ function fly(
             duration: 100,
             easing,
         },
-    )
-    let finished = false
-    animation.onfinish = () => void (finished = true)
+    );
+    let finished = false;
+    animation.onfinish = () => void (finished = true);
     requestAnimationFrame(function updatePosition() {
         if (finished) {
-            appWindow.setPosition(endPosition)
-            stub.remove()
+            appWindow.setPosition(endPosition);
+            stub.remove();
         } else {
-            animation.commitStyles()
-            const left = stub.style.getPropertyValue("--fly-animation-x")
-            const top = stub.style.getPropertyValue("--fly-animation-y")
-            appWindow.setPosition(
-                new LogicalPosition(Number(left), Number(top)),
-            )
-            requestAnimationFrame(updatePosition)
+            animation.commitStyles();
+            const left = stub.style.getPropertyValue("--fly-animation-x");
+            const top = stub.style.getPropertyValue("--fly-animation-y");
+            appWindow.setPosition(new LogicalPosition(Number(left), Number(top)));
+            requestAnimationFrame(updatePosition);
         }
-    })
-    return animation
+    });
+    return animation;
 }
 
 watchDelayed(() => (panelState.width, panelState.height, void 0), locatePanel, {
     delay: 500,
     leading: true,
-})
+});
 
-appWindow.onScaleChanged(() => locatePanel())
+appWindow.onScaleChanged(() => locatePanel());
 
 function preferReducedMotion(): boolean {
-    return matchMedia("(prefers-reduced-motion)").matches
+    return matchMedia("(prefers-reduced-motion)").matches;
 }
 
 async function showWindow(clickPosition?: RawPosition) {
-    await locatePanel(clickPosition, !preferReducedMotion())
-    await appWindow.show()
-    await appWindow.setFocus()
-    await invoke("refresh_mica")
+    await locatePanel(clickPosition, !preferReducedMotion());
+    await appWindow.show();
+    await appWindow.setFocus();
+    await invoke("refresh_mica");
 }
 
 async function hideWindow() {
     if (!preferReducedMotion()) {
         const windowPosition = (await appWindow.outerPosition()).toLogical(
             await appWindow.scaleFactor(),
-        )
+        );
         const endPosition = new LogicalPosition(
             windowPosition.x,
             windowPosition.y + panelState.height + 50,
-        )
-        await fly(windowPosition, endPosition, "ease-in").finished
+        );
+        await fly(windowPosition, endPosition, "ease-in").finished;
     }
-    await appWindow.hide()
+    await appWindow.hide();
 }
 
-listen(
-    "tray-icon-click",
-    async ({ payload: clickPosition }: Event<RawPosition>) => {
-        if (await appWindow.isVisible()) {
-            await hideWindow()
-        } else {
-            await showWindow(clickPosition)
-        }
-    },
-)
+listen("tray-icon-click", async ({ payload: clickPosition }: Event<RawPosition>) => {
+    if (await appWindow.isVisible()) {
+        await hideWindow();
+    } else {
+        await showWindow(clickPosition);
+    }
+});
 
 if (import.meta.env.PROD) {
     watchDelayed(
         () => panelState.focused,
-        focused => {
+        (focused) => {
             if (!focused) {
-                hideWindow()
+                hideWindow();
             }
         },
         100,
-    )
+    );
 }
 
-export default panelState
+export default panelState;

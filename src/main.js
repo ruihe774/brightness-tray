@@ -1,13 +1,13 @@
-import { createApp } from "vue"
-import monitorManager from "./monitor"
-import BrightnessPanel from "./components/BrightnessPanel.vue"
-import "./wm"
-import "./style.global.sass"
+import { createApp } from "vue";
+import monitorManager from "./monitor";
+import BrightnessPanel from "./components/BrightnessPanel.vue";
+import "./wm";
+import "./style.global.sass";
 
-createApp(BrightnessPanel).mount("#root")
+createApp(BrightnessPanel).mount("#root");
 
-monitorManager.refreshMonitors()
+monitorManager.refreshMonitors();
 
 if (import.meta.env.PROD) {
-    document.addEventListener("contextmenu", e => e.preventDefault())
+    document.addEventListener("contextmenu", (e) => e.preventDefault());
 }
