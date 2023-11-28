@@ -10,7 +10,7 @@ tauri-build = { version = "1.5", features = [] }
 monitor = { path = "monitor" }
 raw-window-handle = "0.5"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.5.x", features = ["wry", "window-set-focus", "window-set-position", "window-set-size", "window-show", "window-hide", "system-tray", "icon-ico"], default-features = false }
+tauri = { version = "1.5.x", features = ["wry", "window-set-focus", "window-set-position", "window-set-size", "window-show", "window-hide", "system-tray"], default-features = false }
 windows-version = "0.1"
 
 [dependencies.windows]

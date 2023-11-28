@@ -1,31 +1,23 @@
-use tauri::{CustomMenuItem, Icon, SystemTray, SystemTrayHandle, SystemTrayMenu, Theme};
+use serde::{Deserialize, Serialize};
+use tauri::{Icon, Manager, Window};
 
-use crate::util::ThemableIcon;
+use crate::util::JSResult;
 
-#[derive(Debug)]
-pub struct TrayManager {
-    icon: ThemableIcon,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrayIcon {
+    rgba: Vec<u8>,
+    width: u32,
+    height: u32,
 }
 
-impl TrayManager {
-    pub fn new() -> TrayManager {
-        TrayManager {
-            icon: ThemableIcon {
-                light: Icon::Raw(Vec::from(include_bytes!("../icons/light.ico"))),
-                dark: Icon::Raw(Vec::from(include_bytes!("../icons/dark.ico"))),
-            },
-        }
-    }
-
-    pub fn make_system_tray(&self) -> SystemTray {
-        SystemTray::new()
-            .with_menu(
-                SystemTrayMenu::new().add_item(CustomMenuItem::new("quit".to_owned(), "Quit")),
-            )
-            .with_icon(self.icon.choose(None).clone())
-    }
-
-    pub fn set_theme(&self, tray: &SystemTrayHandle, theme: Option<Theme>) {
-        tray.set_icon(self.icon.choose(theme).clone()).unwrap();
-    }
+#[tauri::command]
+pub fn set_tray_icon(window: Window, icon: TrayIcon) -> JSResult<()> {
+    let tray = window.app_handle().tray_handle();
+    let icon = Icon::Rgba {
+        rgba: icon.rgba,
+        width: icon.width,
+        height: icon.height,
+    };
+    tray.set_icon(icon)?;
+    Ok(())
 }

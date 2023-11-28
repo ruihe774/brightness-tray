@@ -20,14 +20,14 @@
       }
     },
     "systemTray": {
-      "iconPath": "icons/light.ico"
+      "iconPath": "app.ico"
     },
     "bundle": {
       "identifier": "io.misakikasumi.brightness-tray",
       "publisher": "Misaki Kasumi",
       "category": "Utility",
       "icon": [
-        "icons/light.ico"
+        "app.ico"
       ]
     },
     "security": {

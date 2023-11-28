@@ -1,13 +1,15 @@
 import { invoke } from "@tauri-apps/api";
 import { listen, Event } from "@tauri-apps/api/event";
 import { LogicalPosition, LogicalSize, PhysicalPosition, appWindow } from "@tauri-apps/api/window";
-import { reactive } from "vue";
+import { reactive, watch, watchEffect } from "vue";
 import { watchDelayed } from "./util";
 
 const panelState = reactive({
     width: 0,
     height: 0,
     focused: false,
+    scaleFactor: await appWindow.scaleFactor(),
+    theme: await appWindow.theme(),
 });
 
 const resizoObserver = new ResizeObserver((entries) => {
@@ -20,6 +22,14 @@ resizoObserver.observe(document.querySelector("html")!);
 
 appWindow.onFocusChanged(({ payload }) => {
     panelState.focused = payload;
+});
+
+appWindow.onScaleChanged(({ payload }) => {
+    panelState.scaleFactor = payload.scaleFactor;
+});
+
+appWindow.onThemeChanged(({ payload }) => {
+    panelState.theme = payload;
 });
 
 interface RawPosition {
@@ -117,12 +127,12 @@ function fly(
     return animation;
 }
 
-watchDelayed(() => (panelState.width, panelState.height, void 0), locatePanel, {
+watchDelayed(() => void (panelState.width, panelState.height), locatePanel, {
     delay: 500,
     leading: true,
 });
 
-appWindow.onScaleChanged(() => locatePanel());
+watch(() => void panelState.scaleFactor, locatePanel);
 
 function preferReducedMotion(): boolean {
     return matchMedia("(prefers-reduced-motion)").matches;
@@ -168,5 +178,29 @@ if (import.meta.env.PROD) {
         100,
     );
 }
+
+watchEffect(() => {
+    const baseSize = 16;
+    const scaledSize = Math.round(baseSize * panelState.scaleFactor);
+    const canvas = document.createElement("canvas");
+    canvas.width = scaledSize;
+    canvas.height = scaledSize;
+    const ctx = canvas.getContext("2d")!;
+    ctx.font = `${scaledSize}px Segoe Fluent Icons`;
+    ctx.fillStyle = panelState.theme == "dark" ? "white" : "black";
+    ctx.fillText("\uE706", 0, scaledSize);
+    if (panelState.theme != "dark") {
+        // make it a little bolder
+        ctx.fillText("\uE706", 0, scaledSize);
+    }
+    const imageData = ctx.getImageData(0, 0, scaledSize, scaledSize);
+    invoke("set_tray_icon", {
+        icon: {
+            rgba: Array.from(imageData.data),
+            width: imageData.width,
+            height: imageData.height,
+        },
+    });
+});
 
 export default panelState;

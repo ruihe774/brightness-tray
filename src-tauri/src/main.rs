@@ -8,7 +8,7 @@ mod tray;
 mod util;
 mod wm;
 
-use tauri::{Manager, SystemTrayEvent, WindowEvent};
+use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
 
 fn main() {
     process::hook_panic();
@@ -16,27 +16,11 @@ fn main() {
     process::ensure_singleton();
     process::init_com().expect("failed to initialize COM");
 
-    let tray_manager = tray::TrayManager::new();
-    let monitor_manager = monitors::MonitorManager::new();
     tauri::Builder::default()
-        .system_tray(tray_manager.make_system_tray())
-        .manage(tray_manager)
-        .manage(monitor_manager)
-        .setup(move |app| {
-            let panel = app.get_window("panel").unwrap();
-            let app = panel.app_handle();
-            app.state::<tray::TrayManager>()
-                .set_theme(&app.tray_handle(), panel.theme().ok());
-            panel.on_window_event(move |event| {
-                if let WindowEvent::ThemeChanged(theme) = event {
-                    app.state::<tray::TrayManager>()
-                        .set_theme(&app.tray_handle(), Some(*theme));
-                }
-            });
-            #[cfg(debug_assertions)]
-            panel.open_devtools();
-            Ok(())
-        })
+        .system_tray(SystemTray::new().with_menu(
+            SystemTrayMenu::new().add_item(CustomMenuItem::new("quit".to_owned(), "Quit")),
+        ))
+        .manage(monitors::MonitorManager::new())
         .invoke_handler(tauri::generate_handler![
             monitors::refresh_monitors,
             monitors::get_monitors,
@@ -46,6 +30,7 @@ fn main() {
             colors::get_accent_colors,
             wm::refresh_mica,
             wm::get_workarea_corner,
+            tray::set_tray_icon,
         ])
         .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::LeftClick { position, .. } => {

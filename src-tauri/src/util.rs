@@ -2,7 +2,6 @@ use std::error::Error;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
-use tauri::{Icon, Theme};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -42,18 +41,3 @@ fn error_to_message<E: Error>(e: E) -> String {
 }
 
 pub type JSResult<T> = Result<T, JSError>;
-
-#[derive(Debug)]
-pub struct ThemableIcon {
-    pub dark: Icon,
-    pub light: Icon,
-}
-
-impl ThemableIcon {
-    pub fn choose(&self, theme: Option<Theme>) -> &Icon {
-        match theme {
-            Some(Theme::Dark) => &self.dark,
-            _ => &self.light,
-        }
-    }
-}
