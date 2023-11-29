@@ -15,7 +15,6 @@
         "setFocus": true,
         "setPosition": true,
         "setSize": true,
-        "setAlwaysOnTop": true,
         "show": true,
         "hide": true
       }
