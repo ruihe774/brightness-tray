@@ -41,7 +41,7 @@ async function locatePanel(
     positionInMonitor?: RawPosition,
     animated?: boolean,
     oldSize?: { width: number; height: number },
-): Promise<Animation[]> {
+): Promise<Animation | undefined> {
     const anchorPosition = positionInMonitor ?? (await appWindow.innerPosition());
     const windowSize = new LogicalSize(
         Math.max(300, panelState.width),
@@ -62,15 +62,15 @@ async function locatePanel(
     bottom -= 12;
     const windowPosition = new LogicalPosition(right - width, bottom - height);
     const { x: left, y: top } = windowPosition;
-    const animations: Animation[] = [];
+    let animation: Animation | undefined;
     if (animated) {
         const startPosition = new LogicalPosition(left, top + height - (oldSize?.height ?? 0));
-        animations.push(animateWindow(startPosition, windowPosition, "ease-out"));
+        animation = animateWindow(startPosition, windowPosition, "ease-out");
     } else {
         await appWindow.setPosition(windowPosition);
     }
     await appWindow.setSize(windowSize);
-    return animations;
+    return animation;
 }
 
 CSS.registerProperty({
@@ -163,13 +163,17 @@ function preferReducedMotion(): boolean {
 }
 
 async function showWindow(clickPosition?: RawPosition): Promise<void> {
-    await locatePanel(clickPosition, !preferReducedMotion());
+    (await locatePanel(clickPosition, !preferReducedMotion()))?.finished.then(async () => {
+        await appWindow.setAlwaysOnTop(true);
+        await invoke("refresh_mica");
+    });
     await appWindow.show();
     await appWindow.setFocus();
     await invoke("refresh_mica");
 }
 
 async function hideWindow(): Promise<void> {
+    await appWindow.setAlwaysOnTop(false);
     if (!preferReducedMotion()) {
         const windowPosition = (await appWindow.outerPosition()).toLogical(
             await appWindow.scaleFactor(),
