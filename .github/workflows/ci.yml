@@ -48,6 +48,11 @@ jobs:
         check-latest: true
         cache: npm
       name: Setup Node
+    - uses: actions/cache@v3
+      with:
+        key: cargo
+        path: ~/.cargo
+      name: Cache cargo
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: i686-pc-windows-msvc
