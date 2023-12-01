@@ -109,6 +109,9 @@
     @extend .resetInput
     margin: 0.15rem
 
+    &:disabled
+        pointer-events: none
+
     &::-webkit-slider-thumb
         @extend .resetInput
         box-sizing: content-box
@@ -136,3 +139,9 @@
         background: linear-gradient(to var(--slider-end), var(--slider-thumb-color), var(--slider-thumb-color) var(--slider-value), var(--slider-track-color) var(--slider-value), var(--slider-track-color))
         block-size: 0.3rem
         border-radius: 0.6rem
+
+.selectable
+    user-select: text
+
+.inactive
+    filter: grayscale(0.7) brightness(0.7)

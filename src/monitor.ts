@@ -13,6 +13,7 @@ export interface Feature {
     value: Reply;
     syncing: boolean;
     readonly: boolean;
+    written: boolean;
 }
 
 export interface Monitor {
@@ -26,6 +27,8 @@ function timeout(millis: number): Promise<undefined> {
         setTimeout(resolve, millis);
     });
 }
+
+const featureTestTime = 200;
 
 export class Manager {
     readonly monitors: DeepReadonly<Monitor[]> = reactive([]);
@@ -64,7 +67,6 @@ export class Manager {
         for (const monitor of monitors) {
             pool.push(
                 (async () => {
-                    const featureTestTime = 200;
                     const featureNames = monitor.features.length
                         ? monitor.features.map((feature) => feature.name)
                         : ["luminance", "contrast", "brightness", "volume", "powerstate"];
@@ -93,6 +95,7 @@ export class Manager {
                                     value,
                                     syncing: false,
                                     readonly: false,
+                                    written: false,
                                 });
                             }
                         } else if (idx != -1) {
@@ -136,8 +139,10 @@ export class Manager {
 
     updateFeature(id: string, name: string, value: number): void {
         const feature = this.getFeature(id, name) as Feature;
-        feature.value.current = value;
-        feature.syncing = true;
+        if (feature.value.current != value) {
+            feature.value.current = value;
+            feature.syncing = true;
+        }
     }
 }
 
@@ -153,15 +158,38 @@ watch(
                     for (const monitor of monitors) {
                         for (const feature of monitor.features) {
                             if (feature.syncing) {
-                                feature.syncing = false;
-                                invoke("set_monitor_feature", {
-                                    id: monitor.id,
-                                    feature: feature.name,
-                                    value: feature.value.current,
-                                }).catch(() => {
-                                    feature.readonly = true;
-                                    monitorManager.refresh();
-                                });
+                                (async () => {
+                                    try {
+                                        feature.syncing = false;
+                                        if (!feature.written) {
+                                            feature.readonly = true;
+                                        }
+                                        await invoke("set_monitor_feature", {
+                                            id: monitor.id,
+                                            feature: feature.name,
+                                            value: feature.value.current,
+                                        });
+                                        if (!feature.written) {
+                                            await timeout(featureTestTime);
+                                            const value = await invoke<Reply>(
+                                                "get_monitor_feature",
+                                                {
+                                                    id: monitor.id,
+                                                    feature: feature.name,
+                                                },
+                                            );
+                                            if (value.current == feature.value.current) {
+                                                feature.written = true;
+                                                feature.readonly = false;
+                                            } else {
+                                                feature.value = value;
+                                            }
+                                        }
+                                    } catch {
+                                        feature.readonly = true;
+                                        monitorManager.refresh();
+                                    }
+                                })();
                             }
                         }
                     }

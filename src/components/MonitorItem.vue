@@ -54,7 +54,10 @@ export default defineComponent({
         >
             <div>
                 <span :class="sheet.bigIcon" aria-label="monitor">&#xE7F4;</span>
-                <span :class="sheet.titleFont" style="margin-inline-start: 0.15em">
+                <span
+                    :class="[sheet.titleFont, sheet.selectable]"
+                    style="margin-inline-start: 0.15em"
+                >
                     {{ name }}
                 </span>
             </div>
@@ -68,9 +71,9 @@ export default defineComponent({
             </button>
         </div>
         <ul :class="[sheet.resetSpacing, sheet.verticalFlex, sheet.stretchItems]">
-            <template v-for="{ name: feature, value } in monitor.features" :key="feature">
-                <li v-if="feature != 'powerstate' && value.maximum" :class="sheet.resetSpacing">
-                    <FeatureSlider :monitor-id="monitorId" :feature="feature" />
+            <template v-for="{ name: featureName, value } in monitor.features" :key="featureName">
+                <li v-if="featureName != 'powerstate' && value.maximum" :class="sheet.resetSpacing">
+                    <FeatureSlider :monitor-id="monitorId" :feature-name="featureName" />
                 </li>
             </template>
         </ul>

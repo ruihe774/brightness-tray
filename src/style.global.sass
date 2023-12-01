@@ -1,10 +1,8 @@
 :root
     font-family: "Segoe UI Variable Text", "Segoe UI"
     font-size: 14px
-    color: black
+    color: var(--foreground)
     user-select: none
-    @media screen and (prefers-color-scheme: dark)
-        color: white
     &[data-writing-mode=horizontal-tb]
         writing-mode: horizontal-tb
     &[data-writing-mode=vertical-lr]
@@ -16,3 +14,7 @@ body
     margin-block: 1.2rem
     margin-inline: 1rem
     overflow: hidden
+
+::selection
+    background: var(--accent)
+    color: white

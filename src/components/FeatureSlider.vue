@@ -17,7 +17,7 @@ export default defineComponent({
             type: String,
             required: true,
         },
-        feature: {
+        featureName: {
             type: String,
             required: true,
         },
@@ -28,23 +28,20 @@ export default defineComponent({
         };
     },
     computed: {
-        featureObject() {
-            return monitorManager.getFeature(this.monitorId, this.feature);
+        feature() {
+            return monitorManager.getFeature(this.monitorId, this.featureName);
         },
         readonly() {
-            return this.featureObject.readonly;
-        },
-        featureValue() {
-            return this.featureObject.value;
+            return this.feature.readonly;
         },
         current() {
-            return this.featureValue.current;
+            return this.feature.value.current;
         },
         maximum() {
-            return this.featureValue.maximum;
+            return this.feature.value.maximum;
         },
         icon() {
-            return (iconMap as { [key: string]: string })[this.feature];
+            return (iconMap as { [key: string]: string })[this.featureName];
         },
     },
     methods: {
@@ -53,10 +50,13 @@ export default defineComponent({
             const target = e.target! as HTMLInputElement;
             if (target.validity.valid) {
                 const value = Number(target.value);
-                monitorManager.updateFeature(this.monitorId, this.feature, value);
+                monitorManager.updateFeature(this.monitorId, this.featureName, value);
             }
         },
         handleWheel(event: Event) {
+            if (this.readonly) {
+                return;
+            }
             const e = event as WheelEvent;
             const target = e.currentTarget! as HTMLInputElement;
             if (e.deltaMode == WheelEvent.DOM_DELTA_PIXEL) {
@@ -64,7 +64,7 @@ export default defineComponent({
                 const current = Number(target.value);
                 monitorManager.updateFeature(
                     this.monitorId,
-                    this.feature,
+                    this.featureName,
                     Math.max(0, Math.min(this.maximum, Math.round(current + offset * 0.01))),
                 );
             }
@@ -74,8 +74,8 @@ export default defineComponent({
 </script>
 
 <template>
-    <label :class="[sheet.flex, sheet.cozyLine]">
-        <span :class="sheet.bigIcon" :aria-label="feature">
+    <label :class="[sheet.flex, sheet.cozyLine, { [sheet.inactive]: readonly }]">
+        <span :class="sheet.bigIcon" :aria-label="featureName">
             {{ icon }}
         </span>
         <input
