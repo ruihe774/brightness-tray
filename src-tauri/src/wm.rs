@@ -3,7 +3,7 @@ use std::mem::{size_of, MaybeUninit};
 
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use tauri::{PhysicalPosition, Theme, Window};
-use windows::core::Error;
+use windows::core::{Error, PCSTR};
 use windows::Win32::Foundation::{BOOL, HWND, POINT};
 use windows::Win32::Graphics::Dwm::{
     DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMSBT_MAINWINDOW,
@@ -14,13 +14,14 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::UI::Controls::MARGINS;
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_SYSMENU,
+    FindWindowA, GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, SWP_ASYNCWINDOWPOS,
+    SWP_NOMOVE, SWP_NOSIZE, WS_SYSMENU,
 };
 
 use crate::util::JSResult;
 
 #[tauri::command]
-pub fn refresh_mica(window: Window) -> JSResult<()> {
+pub fn refresh_panel_style(window: Window) -> JSResult<()> {
     let handle = window.raw_window_handle();
     let RawWindowHandle::Win32(handle) = handle else {
         panic!("failed to get HWND");
@@ -62,6 +63,20 @@ pub fn refresh_mica(window: Window) -> JSResult<()> {
             size_of::<DWM_SYSTEMBACKDROP_TYPE>() as u32,
         )
     }?;
+
+    let tray_wnd = unsafe { FindWindowA(PCSTR::from_raw(b"Shell_TrayWnd\0".as_ptr()), None) };
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            tray_wnd,
+            0,
+            0,
+            0,
+            0,
+            SWP_ASYNCWINDOWPOS | SWP_NOMOVE | SWP_NOSIZE,
+        )
+    }?;
+
     Ok(())
 }
 

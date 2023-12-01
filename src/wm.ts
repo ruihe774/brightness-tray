@@ -149,7 +149,7 @@ async function showWindow(clickPosition?: RawPosition): Promise<void> {
     await locatePanel(clickPosition, !preferReducedMotion());
     await appWindow.show();
     await appWindow.setFocus();
-    await invoke("refresh_mica");
+    await invoke("refresh_panel_style");
 }
 
 async function hideWindow(): Promise<void> {

@@ -28,7 +28,7 @@ fn main() {
             monitors::get_monitor_feature,
             monitors::set_monitor_feature,
             colors::get_accent_colors,
-            wm::refresh_mica,
+            wm::refresh_panel_style,
             wm::get_workarea_corner,
             tray::set_tray_icon,
         ])
