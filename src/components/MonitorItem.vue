@@ -53,7 +53,7 @@ export default defineComponent({
             :class="[sheet.horizontalFlex, sheet.spreadContent, sheet.centerItems, sheet.cozyLine]"
         >
             <div>
-                <span :class="sheet.bigIcon" aria-label="monitor"> &#xE7F4; </span>
+                <span :class="sheet.bigIcon" aria-label="monitor">&#xE7F4;</span>
                 <span :class="sheet.titleFont" style="margin-inline-start: 0.15em">
                     {{ name }}
                 </span>
@@ -64,7 +64,7 @@ export default defineComponent({
                 :class="sheet.borderlessButton"
                 @click="handlePowerOff"
             >
-                <span :class="sheet.icon" aria-label="power off"> &#xE7E8; </span>
+                <span :class="sheet.icon" aria-label="power off">&#xE7E8;</span>
             </button>
         </div>
         <ul :class="[sheet.resetSpacing, sheet.verticalFlex, sheet.stretchItems]">
