@@ -98,10 +98,19 @@ export default defineComponent({
             :max="maximum"
             :value="current"
             :disabled="readonly"
-            :class="[sheet.borderlessNumber, sheet.titleFont]"
-            style="width: 1.7em; text-align: center; margin-inline-start: 0.5em"
+            :class="[sheet.borderlessNumber, sheet.titleFont, 'number']"
+            style="width: 1.7em"
             @input="handleInput"
             @wheel.prevent="handleWheel"
         />
     </label>
 </template>
+
+<style scoped lang="sass">
+.number
+    margin-left: 0.5em
+    [data-writing-mode^=vertical] &
+        margin-left: 0
+        margin-top: -0.3em
+        transform: translate(-0.15em, 0.2em)
+</style>

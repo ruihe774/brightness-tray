@@ -1,8 +1,9 @@
 import { invoke } from "@tauri-apps/api";
 import { listen, Event } from "@tauri-apps/api/event";
 import { LogicalPosition, LogicalSize, PhysicalPosition, appWindow } from "@tauri-apps/api/window";
-import { reactive, watch, watchEffect } from "vue";
+import { reactive, watch, watchEffect, ref, computed } from "vue";
 import { watchDelayed, watchThrottled } from "./watchers";
+import settings from "./settings";
 
 const panelState = reactive({
     width: 350,
@@ -12,13 +13,31 @@ const panelState = reactive({
     theme: await appWindow.theme(),
 });
 
+const html: HTMLHtmlElement = document.querySelector(":root")!;
+const documentSize = ref<ResizeObserverSize>();
+const verticalMode = computed(() => settings.writingMode.startsWith("vertical"));
+
 const resizoObserver = new ResizeObserver((entries) => {
-    const entry = entries[0];
-    const borderBox = entry.borderBoxSize[0];
-    panelState.width = borderBox.inlineSize;
-    panelState.height = borderBox.blockSize;
+    documentSize.value = entries[0].borderBoxSize[0];
 });
-resizoObserver.observe(document.querySelector("html")!);
+resizoObserver.observe(html);
+
+watchEffect(() => {
+    const size = documentSize.value;
+    if (size) {
+        if (verticalMode.value) {
+            panelState.width = size.blockSize;
+            panelState.height = size.inlineSize;
+        } else {
+            panelState.width = size.inlineSize;
+            panelState.height = size.blockSize;
+        }
+    }
+});
+
+watchEffect(() => {
+    html.dataset.writingMode = settings.writingMode;
+});
 
 appWindow.onFocusChanged(({ payload }) => {
     panelState.focused = payload;
@@ -44,8 +63,8 @@ async function locatePanel(
 ): Promise<Animation | undefined> {
     const anchorPosition = positionInMonitor ?? (await appWindow.innerPosition());
     const windowSize = new LogicalSize(
-        Math.max(300, panelState.width),
-        Math.max(50, panelState.height),
+        Math.max(verticalMode.value ? 50 : 350, panelState.width),
+        Math.max(verticalMode.value ? 300 : 50, panelState.height),
     );
     const { width, height } = windowSize;
     const cornerPosition = await invoke<RawPosition>("get_workarea_corner", {

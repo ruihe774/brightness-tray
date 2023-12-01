@@ -5,7 +5,14 @@
     user-select: none
     @media screen and (prefers-color-scheme: dark)
         color: white
+    &[data-writing-mode=horizontal-tb]
+        writing-mode: horizontal-tb
+    &[data-writing-mode=vertical-lr]
+        writing-mode: vertical-lr
+    &[data-writing-mode=vertical-rl]
+        writing-mode: vertical-rl
 
 body
-    margin: 1.2rem 1rem
+    margin-block: 1.2rem
+    margin-inline: 1rem
     overflow: hidden
