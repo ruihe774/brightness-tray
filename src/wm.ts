@@ -41,7 +41,7 @@ async function locatePanel(
     positionInMonitor?: RawPosition,
     animated?: boolean,
     oldSize?: { width: number; height: number },
-): Promise<Animation[]> {
+): Promise<Animation | undefined> {
     const anchorPosition = positionInMonitor ?? (await appWindow.innerPosition());
     const windowSize = new LogicalSize(
         Math.max(300, panelState.width),
@@ -62,15 +62,15 @@ async function locatePanel(
     bottom -= 12;
     const windowPosition = new LogicalPosition(right - width, bottom - height);
     const { x: left, y: top } = windowPosition;
-    const animations: Animation[] = [];
+    let animation: Animation | undefined;
     if (animated) {
         const startPosition = new LogicalPosition(left, top + height - (oldSize?.height ?? 0));
-        animations.push(animateWindow(startPosition, windowPosition, "ease-out"));
+        animation = fly(startPosition, windowPosition, "ease-out");
     } else {
         await appWindow.setPosition(windowPosition);
     }
     await appWindow.setSize(windowSize);
-    return animations;
+    return animation;
 }
 
 CSS.registerProperty({
@@ -86,19 +86,7 @@ CSS.registerProperty({
     initialValue: "0",
 });
 
-function animateWindow(start: LogicalPosition, end: LogicalPosition, easing?: string): Animation;
-function animateWindow(start: LogicalSize, end: LogicalSize, easing?: string): Animation;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function animateWindow(start: any, end: any, easing?: string): Animation {
-    const kind: "fly" | "resize" = "width" in start ? "resize" : "fly";
-    const rawStart = {
-        x: (start.x ?? start.width) as number,
-        y: (start.y ?? start.height) as number,
-    };
-    const rawEnd = {
-        x: (end.x ?? end.width) as number,
-        y: (end.y ?? end.height) as number,
-    };
+function fly(start: LogicalPosition, end: LogicalPosition, easing?: string): Animation {
     const stub = document.createElement("div");
     stub.style.position = "absolute";
     stub.style.visibility = "hidden";
@@ -106,12 +94,12 @@ function animateWindow(start: any, end: any, easing?: string): Animation {
     const animation = stub.animate(
         [
             {
-                "--window-animation-x": rawStart.x,
-                "--window-animation-y": rawStart.y,
+                "--window-animation-x": start.x,
+                "--window-animation-y": start.y,
             },
             {
-                "--window-animation-x": rawEnd.x,
-                "--window-animation-y": rawEnd.y,
+                "--window-animation-x": end.x,
+                "--window-animation-y": end.y,
             },
         ],
         {
@@ -123,24 +111,19 @@ function animateWindow(start: any, end: any, easing?: string): Animation {
     animation.onfinish = () => void (finished = true);
     requestAnimationFrame(function updatePosition() {
         if (finished) {
-            update(rawEnd);
+            appWindow.setPosition(end);
             stub.remove();
         } else {
             animation.commitStyles();
-            update({
-                x: Number(stub.style.getPropertyValue("--window-animation-x")),
-                y: Number(stub.style.getPropertyValue("--window-animation-y")),
-            });
+            appWindow.setPosition(
+                new LogicalPosition(
+                    Number(stub.style.getPropertyValue("--window-animation-x")),
+                    Number(stub.style.getPropertyValue("--window-animation-y")),
+                ),
+            );
             requestAnimationFrame(updatePosition);
         }
     });
-    function update(state: RawPosition): void {
-        if (kind == "fly") {
-            appWindow.setPosition(new LogicalPosition(state.x, state.y));
-        } else {
-            appWindow.setSize(new LogicalSize(state.x, state.y));
-        }
-    }
     return animation;
 }
 
@@ -178,7 +161,7 @@ async function hideWindow(): Promise<void> {
             windowPosition.x,
             windowPosition.y + panelState.height + 50,
         );
-        await animateWindow(windowPosition, endPosition, "ease-in").finished;
+        await fly(windowPosition, endPosition, "ease-in").finished;
     }
     await appWindow.hide();
 }
