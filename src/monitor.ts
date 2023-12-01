@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api";
-import { reactive, watch } from "vue";
+import { reactive, watch, DeepReadonly } from "vue";
 import { watchThrottled } from "./watchers";
 import settings from "./settings";
 
@@ -28,16 +28,17 @@ function timeout(millis: number): Promise<undefined> {
 }
 
 export class Manager {
-    readonly monitors: Monitor[] = reactive([]);
+    readonly monitors: DeepReadonly<Monitor[]> = reactive([]);
     private refreshing: boolean = false;
 
     private async doRefresh(): Promise<void> {
+        const monitors = this.monitors as Monitor[];
         await invoke("refresh_monitors");
         const monitorIds = await invoke<string[]>("get_monitors");
-        const monitorMap = new Map(this.monitors.map((monitor) => [monitor.id, monitor]));
-        this.monitors.splice(0);
+        const monitorMap = new Map(monitors.map((monitor) => [monitor.id, monitor]));
+        monitors.splice(0);
         for (const id of monitorIds) {
-            this.monitors.push(
+            monitors.push(
                 monitorMap.get(id) ?? {
                     id,
                     name: null,
@@ -46,7 +47,7 @@ export class Manager {
             );
         }
         const pool: Promise<void>[] = [];
-        for (const monitor of this.monitors) {
+        for (const monitor of monitors) {
             if (monitor.name == null) {
                 pool.push(
                     (async () => {
@@ -60,7 +61,7 @@ export class Manager {
                 );
             }
         }
-        for (const monitor of this.monitors) {
+        for (const monitor of monitors) {
             pool.push(
                 (async () => {
                     const featureTestTime = 200;
@@ -116,7 +117,7 @@ export class Manager {
         }
     }
 
-    getMonitor(id: string): Monitor {
+    getMonitor(id: string): DeepReadonly<Monitor> {
         const monitor = this.monitors.find((monitor) => monitor.id == id);
         if (monitor) {
             return monitor;
@@ -124,7 +125,7 @@ export class Manager {
         throw new Error(`no such monitor: '${id}'`);
     }
 
-    getFeature(id: string, name: string): Feature {
+    getFeature(id: string, name: string): DeepReadonly<Feature> {
         const monitor = this.getMonitor(id);
         const feature = monitor.features.find((f) => f.name == name);
         if (feature) {
@@ -134,7 +135,7 @@ export class Manager {
     }
 
     updateFeature(id: string, name: string, value: number): void {
-        const feature = this.getFeature(id, name);
+        const feature = this.getFeature(id, name) as Feature;
         feature.value.current = value;
         feature.syncing = true;
     }
@@ -147,7 +148,7 @@ watch(
     (updateInterval, _old, onCleanup) => {
         onCleanup(
             watchThrottled(
-                monitorManager.monitors,
+                monitorManager.monitors as Monitor[],
                 (monitors) => {
                     for (const monitor of monitors) {
                         for (const feature of monitor.features) {
