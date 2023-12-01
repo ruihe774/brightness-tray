@@ -3,6 +3,7 @@ import { watchThrottled } from "./watchers";
 import monitorManager from "./monitor";
 import BrightnessPanel from "./components/BrightnessPanel.vue";
 import panelState from "./wm";
+import "./style";
 import "./style.global.sass";
 
 createApp(BrightnessPanel).mount("#root");

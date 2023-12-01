@@ -1,8 +1,7 @@
-<script setup lang="ts">
 import { invoke } from "@tauri-apps/api";
-import { computed, reactive } from "vue";
-import { watchThrottled } from "../watchers";
-import panelState from "../wm";
+import { watchEffect, reactive } from "vue";
+import { watchThrottled } from "./watchers";
+import panelState from "./wm";
 
 interface Color {
     r: number;
@@ -21,19 +20,13 @@ watchThrottled(
     { throttle: 1000, immediate: true },
 );
 
-const style = computed(() => {
-    const style: string[] = [];
+const html: HTMLHtmlElement = document.querySelector(":root")!;
+
+watchEffect(() => {
     for (const [name, { r, g, b }] of Object.entries(colors)) {
-        style.push(
-            `--${name.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()}:rgb(${r},${g},${b})`,
+        html.style.setProperty(
+            `--${name.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()}`,
+            `rgb(${r},${g},${b})`,
         );
     }
-    return style.join(";");
 });
-</script>
-
-<template>
-    <div :style="style">
-        <slot />
-    </div>
-</template>
