@@ -1,5 +1,6 @@
 <script lang="ts">
 import { defineComponent } from "vue";
+import { clamp } from "lodash-es";
 import monitorManager from "../monitor";
 import sheet from "../style.module.sass";
 
@@ -65,7 +66,7 @@ export default defineComponent({
                 monitorManager.updateFeature(
                     this.monitorId,
                     this.featureName,
-                    Math.clamp(Math.round(current + offset * 0.01), 0, this.maximum),
+                    clamp(Math.round(current + offset * 0.01), 0, this.maximum),
                 );
             }
         },
