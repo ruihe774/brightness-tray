@@ -21,7 +21,7 @@ if (import.meta.env.PROD) {
     document.addEventListener("keydown", (e) => {
         if (!e.metaKey && !e.altKey && (e.ctrlKey ? e.key == "r" : e.key == "F5")) {
             e.preventDefault();
-            monitorManager.refreshMonitors();
+            monitorManager.refresh();
         }
     });
 }
