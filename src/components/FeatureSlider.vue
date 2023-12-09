@@ -65,7 +65,7 @@ export default defineComponent({
                 monitorManager.updateFeature(
                     this.monitorId,
                     this.featureName,
-                    Math.max(0, Math.min(this.maximum, Math.round(current + offset * 0.01))),
+                    Math.clamp(Math.round(current + offset * 0.01), 0, this.maximum),
                 );
             }
         },
