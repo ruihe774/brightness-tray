@@ -3,7 +3,6 @@ import { watchThrottled } from "./watchers";
 import monitorManager from "./monitor";
 import BrightnessPanel from "./components/BrightnessPanel.vue";
 import panelState from "./wm";
-import "./polyfill";
 import "./style";
 import "./style.global.sass";
 
