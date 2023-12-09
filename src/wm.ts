@@ -3,6 +3,7 @@ import { listen, Event } from "@tauri-apps/api/event";
 import { LogicalPosition, LogicalSize, PhysicalPosition, appWindow } from "@tauri-apps/api/window";
 import { reactive, watch, watchEffect, ref, computed } from "vue";
 import { watchDelayed, watchThrottled } from "./watchers";
+import { toBase64 } from "./polyfill";
 import settings from "./settings";
 
 const panelState = reactive({
@@ -222,7 +223,7 @@ watchEffect(() => {
     const imageData = ctx.getImageData(0, 0, scaledSize, scaledSize);
     invoke("set_tray_icon", {
         icon: {
-            rgba: new Uint8Array(imageData.data.buffer).toBase64(),
+            rgba: toBase64(imageData.data),
             width: imageData.width,
             height: imageData.height,
         },

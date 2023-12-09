@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@tauri-apps/api": "1.5.x",
-    "core-js": "^3.34.0",
     "lodash-es": "4.x",
     "vue": "3.x"
   },
