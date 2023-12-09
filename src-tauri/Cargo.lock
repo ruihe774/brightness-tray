@@ -138,6 +138,7 @@ dependencies = [
  "monitor",
  "raw-window-handle",
  "serde",
+ "serde_with",
  "tauri",
  "tauri-build",
  "windows 0.52.0",

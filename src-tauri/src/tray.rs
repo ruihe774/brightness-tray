@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
+use serde_with::{base64::Base64, serde_as};
 use tauri::{Icon, Manager, Window};
 
 use crate::util::JSResult;
 
+#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrayIcon {
+    #[serde_as(as = "Base64")]
     rgba: Vec<u8>,
     width: u32,
     height: u32,

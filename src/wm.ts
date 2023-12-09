@@ -222,7 +222,7 @@ watchEffect(() => {
     const imageData = ctx.getImageData(0, 0, scaledSize, scaledSize);
     invoke("set_tray_icon", {
         icon: {
-            rgba: Array.from(imageData.data),
+            rgba: new Uint8Array(imageData.data.buffer).toBase64(),
             width: imageData.width,
             height: imageData.height,
         },
