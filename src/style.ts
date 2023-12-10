@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api";
 import { watchEffect, reactive } from "vue";
+import { kebabCase } from "lodash-es";
 import { watchThrottled } from "./watchers";
 import panelState from "./wm";
 
@@ -24,9 +25,6 @@ const html: HTMLHtmlElement = document.querySelector(":root")!;
 
 watchEffect(() => {
     for (const [name, { r, g, b }] of Object.entries(colors)) {
-        html.style.setProperty(
-            `--${name.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()}`,
-            `rgb(${r},${g},${b})`,
-        );
+        html.style.setProperty(`--${kebabCase(name)}`, `rgb(${r},${g},${b})`);
     }
 });
