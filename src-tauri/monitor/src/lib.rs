@@ -281,9 +281,10 @@ impl Monitor {
         id
     }
 
-    fn get_wmi_instance(&self, class: &str) -> Result<Option<IWbemClassObject>> {
-        let query = format!("SELECT * FROM {class} WHERE InstanceName=\"");
-        let mut query: Vec<_> = query.encode_utf16().collect();
+    fn get_wmi_instance(&self, class: &[u16]) -> Result<Option<IWbemClassObject>> {
+        let mut query = Vec::from(L!("SELECT * FROM "));
+        query.extend_from_slice(class);
+        query.extend(L!(" WHERE InstanceName=\""));
         let instance_name = self.get_wmi_instance_name();
         query.extend(instance_name.into_iter().flat_map(|ch| match ch {
             L!('\\') => [ch, ch].into_iter().take(2),
@@ -295,7 +296,7 @@ impl Monitor {
     }
 
     pub fn get_user_friendly_name(&self) -> Result<Option<OsString>> {
-        let Some(instance) = self.get_wmi_instance("WmiMonitorID")? else {
+        let Some(instance) = self.get_wmi_instance(&L!("WmiMonitorID"))? else {
             return Ok(None);
         };
         let mut variant: mem::MaybeUninit<VARIANT> = mem::MaybeUninit::uninit();
