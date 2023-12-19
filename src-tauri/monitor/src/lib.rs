@@ -3,19 +3,20 @@ use std::ffi::{c_void, OsString};
 use std::fmt::Write as _;
 use std::mem;
 use std::num::NonZeroUsize;
+use std::ops::DerefMut;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::ptr;
 
 use once_cell::race::OnceNonZeroUsize;
 use wide::L;
 pub use windows::core::{Error, Result};
-use windows::core::{Interface, BSTR, PCWSTR};
+use windows::core::{Interface, BSTR, PCWSTR, HSTRING};
 use windows::Win32::Devices::Display::{
     DestroyPhysicalMonitor, GetNumberOfPhysicalMonitorsFromHMONITOR,
     GetPhysicalMonitorsFromHMONITOR, GetVCPFeatureAndVCPFeatureReply, SetVCPFeature,
     PHYSICAL_MONITOR,
 };
-use windows::Win32::Foundation::{BOOL, HANDLE, LPARAM, RECT};
+use windows::Win32::Foundation::{BOOL, HANDLE, LPARAM, RECT, E_FAIL};
 use windows::Win32::Graphics::Gdi::{
     EnumDisplayDevicesW, EnumDisplayMonitors, GetMonitorInfoW, DISPLAY_DEVICEW,
     DISPLAY_DEVICE_ATTACHED_TO_DESKTOP, DISPLAY_DEVICE_MIRRORING_DRIVER, HDC, HMONITOR,
@@ -25,10 +26,10 @@ use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::System::Ole::{
     SafeArrayAccessData, SafeArrayGetLBound, SafeArrayGetUBound, SafeArrayUnaccessData,
 };
-use windows::Win32::System::Variant::{VariantClear, VARIANT, VT_ARRAY};
+use windows::Win32::System::Variant::{VariantClear, VARIANT, VT_ARRAY, VT_UI1, VariantInit};
 use windows::Win32::System::Wmi::{
     IWbemClassObject, IWbemLocator, IWbemServices, WbemLocator, WBEM_FLAG_CONNECT_USE_MAX_WAIT,
-    WBEM_FLAG_FORWARD_ONLY,
+    WBEM_FLAG_FORWARD_ONLY, WBEM_RETURN_WHEN_COMPLETE, CIM_UINT32,
 };
 
 #[derive(Debug)]
@@ -170,8 +171,19 @@ fn get_monitors_ddcci(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<Os
     }
 }
 
-fn get_monitors_wmi(_monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<OsString, OsString>) {
-    debug_assert!(monitor_ids.is_empty(), "WMI support is not implemented yet");
+fn get_monitors_wmi(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<OsString, OsString>) {
+    for (_, id) in monitor_ids.iter_mut() {
+        let mut monitor = Monitor {
+            id: mem::take(id),
+            handle: HANDLE(-1),
+        };
+        if monitor.get_wmi_instance(&L!("WmiMonitorID")).is_ok_and(|obj| obj.is_some()) {
+            monitors.push(monitor);
+        } else {
+            mem::swap(id, &mut monitor.id);
+        }
+    }
+    monitor_ids.retain(|_, v| !v.is_empty());
 }
 
 pub fn get_monitors() -> Vec<Monitor> {
@@ -245,16 +257,32 @@ impl Feature {
 impl Monitor {
     pub fn get_feature(&self, feature: Feature) -> Result<Reply> {
         if self.handle.0 == -1 {
-            unimplemented!()
+            self.get_wmi_feature(feature)
+        } else {
+            let r = get_vcp(self.handle, feature.vcp_code());
+            if r.is_err() {
+                let r = self.get_wmi_feature(feature);
+                if r.is_ok() {
+                    return r;
+                }
+            }
+            r
         }
-        get_vcp(self.handle, feature.vcp_code())
     }
 
     pub fn set_feature(&self, feature: Feature, value: u32) -> Result<()> {
         if self.handle.0 == -1 {
-            unimplemented!()
+            self.set_wmi_feature(feature, value)
+        } else {
+            let r = set_vcp(self.handle, feature.vcp_code(), value);
+            if r.is_err() {
+                let r = self.set_wmi_feature(feature, value);
+                if r.is_ok() {
+                    return r;
+                }
+            }
+            r
         }
-        set_vcp(self.handle, feature.vcp_code(), value)
     }
 }
 
@@ -300,8 +328,7 @@ impl Monitor {
             return Ok(None);
         };
         let mut variant: mem::MaybeUninit<VARIANT> = mem::MaybeUninit::uninit();
-        let user_friendly_name = PCWSTR::from_raw(L!("UserFriendlyName\0").as_ptr());
-        unsafe { instance.Get(user_friendly_name, 0, variant.as_mut_ptr(), None, None) }?;
+        unsafe { instance.Get(PCWSTR::from_raw(L!("UserFriendlyName\0").as_ptr()), 0, variant.as_mut_ptr(), None, None) }?;
         let mut variant = unsafe { variant.assume_init() };
         let s = ((unsafe { &variant.Anonymous.Anonymous }.vt.0 & VT_ARRAY.0) != 0)
             .then(|| {
@@ -325,6 +352,54 @@ impl Monitor {
             .transpose();
         unsafe { VariantClear(&mut variant) }?;
         s
+    }
+
+    fn get_wmi_feature(&self, feature: Feature) -> Result<Reply> {
+        if feature != Feature::Luminance {
+            return Err(Error::new(E_FAIL, HSTRING::from_wide(&L!("Feature not supported."))?));
+        }
+        let Some(instance) = self.get_wmi_instance(&L!("WmiMonitorBrightness"))? else {
+            return Err(Error::new(E_FAIL, HSTRING::from_wide(&L!("Failed to get the WmiMonitorBrightness instance."))?));
+        };
+        let mut variant: mem::MaybeUninit<VARIANT> = mem::MaybeUninit::uninit();
+        unsafe { instance.Get(PCWSTR::from_raw(L!("CurrentBrightness\0").as_ptr()), 0, variant.as_mut_ptr(), None, None)}?;
+        let mut variant = unsafe { variant.assume_init() };
+        let brightness = unsafe { variant.Anonymous.Anonymous.Anonymous.intVal };
+        unsafe { VariantClear(&mut variant) }?;
+        Ok(Reply { current: brightness as u32, maximum: 100 })
+    }
+
+    fn set_wmi_feature(&self, feature: Feature, value: u32) -> Result<()> {
+        if feature != Feature::Luminance {
+            return Err(Error::new(E_FAIL, HSTRING::from_wide(&L!("Feature not supported."))?));
+        }
+        let services = get_wmi_services()?;
+        let Some(instance) = self.get_wmi_instance(&L!("WmiMonitorBrightnessMethods"))? else {
+            return Err(Error::new(E_FAIL, HSTRING::from_wide(&L!("Failed to get the WmiMonitorBrightnessMethods instance."))?));
+        };
+        let mut class = None;
+        unsafe { services.GetObject(&BSTR::from_wide(&L!("WmiMonitorBrightnessMethods"))?, WBEM_RETURN_WHEN_COMPLETE, None, Some(&mut class), None) }?;
+        let class = class.unwrap();
+        let mut signature = None;
+        unsafe { class.GetMethod(PCWSTR::from_raw(L!("WmiSetBrightness\0").as_ptr()), 0, &mut signature, ptr::null_mut()) }?;
+        let signature = signature.unwrap();
+        let param = unsafe { signature.SpawnInstance(0) }?;
+        let mut var = unsafe { VariantInit() };
+        unsafe { var.Anonymous.Anonymous.deref_mut().vt.0 = VT_UI1.0 };
+        unsafe { var.Anonymous.Anonymous.deref_mut().Anonymous.cVal = 0 };
+        unsafe { param.Put(PCWSTR::from_raw(L!("Timeout\0").as_ptr()), 0, &mut var, CIM_UINT32.0) }?;
+        unsafe { VariantClear(&mut var) }?;
+        var = unsafe { VariantInit() };
+        unsafe { var.Anonymous.Anonymous.deref_mut().vt.0 = VT_UI1.0 };
+        unsafe { var.Anonymous.Anonymous.deref_mut().Anonymous.cVal = value as u8 };
+        unsafe { param.Put(PCWSTR::from_raw(L!("Brightness\0").as_ptr()), 0, &mut var, CIM_UINT32.0) }?;
+        unsafe { VariantClear(&mut var) }?;
+        let mut path_var :mem::MaybeUninit<VARIANT> = mem::MaybeUninit::uninit();
+        unsafe { instance.Get(PCWSTR::from_raw(L!("__PATH\0").as_ptr()), 0, path_var.as_mut_ptr(), None, None) }?;
+        let path_var = unsafe { path_var.assume_init() };
+        let path: &BSTR = unsafe { &path_var.Anonymous.Anonymous.Anonymous.bstrVal };
+        unsafe { services.ExecMethod(path, &BSTR::from_wide(&L!("WmiSetBrightness"))?, WBEM_RETURN_WHEN_COMPLETE, None, &param, None, None) }?;
+        Ok(())
     }
 }
 
@@ -384,9 +459,7 @@ fn get_wmi_services() -> Result<IWbemServices> {
 
 fn query_wmi(query: &[u16]) -> Result<Option<IWbemClassObject>> {
     let services = get_wmi_services()?;
-    let wql = BSTR::from_wide(&L!("WQL"))?;
-    let query = BSTR::from_wide(query)?;
-    let enumerator = unsafe { services.ExecQuery(&wql, &query, WBEM_FLAG_FORWARD_ONLY, None) }?;
+    let enumerator = unsafe { services.ExecQuery(&BSTR::from_wide(&L!("WQL"))?, &BSTR::from_wide(query)?, WBEM_FLAG_FORWARD_ONLY, None) }?;
     let mut objects = [None; 1];
     let mut returned = 0;
     let _ = unsafe { enumerator.Next(1000, &mut objects, &mut returned) };
