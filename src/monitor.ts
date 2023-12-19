@@ -185,7 +185,8 @@ watch(
                                                 feature.value = value;
                                             }
                                         }
-                                    } catch {
+                                    } catch (e) {
+                                        console.error(e);
                                         feature.readonly = true;
                                         monitorManager.refresh();
                                     }
