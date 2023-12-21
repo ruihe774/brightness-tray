@@ -177,7 +177,13 @@ fn get_monitors_gdi(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<OsSt
                 .read(true)
                 .write(true)
                 .open(&id)
-                .map_or(HANDLE(-1), |f| HANDLE(f.into_raw_handle() as isize));
+                .map_or_else(
+                    |e| {
+                        debug_assert!(false, "failed to open device file handle: {e:?}");
+                        HANDLE(-1)
+                    },
+                    |f| HANDLE(f.into_raw_handle() as isize),
+                );
             monitors.push(Monitor {
                 id,
                 hphysical,
