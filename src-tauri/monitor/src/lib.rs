@@ -1,22 +1,26 @@
+#![allow(clippy::uninit_vec)]
+
 use std::collections::BTreeMap;
 use std::ffi::{c_void, OsString};
 use std::fmt::Write as _;
+use std::fs::OpenOptions;
 use std::mem;
 use std::num::NonZeroUsize;
-use std::ops::DerefMut;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
+use std::os::windows::io::IntoRawHandle;
 use std::ptr;
 
 use once_cell::race::OnceNonZeroUsize;
 use wide::L;
 pub use windows::core::{Error, Result};
-use windows::core::{Interface, BSTR, HSTRING, PCWSTR};
+use windows::core::{Interface, BSTR, PCWSTR};
 use windows::Win32::Devices::Display::{
     DestroyPhysicalMonitor, GetNumberOfPhysicalMonitorsFromHMONITOR,
     GetPhysicalMonitorsFromHMONITOR, GetVCPFeatureAndVCPFeatureReply, SetVCPFeature,
-    PHYSICAL_MONITOR,
+    DISPLAYPOLICY_AC, DISPLAYPOLICY_DC, DISPLAY_BRIGHTNESS, IOCTL_VIDEO_QUERY_DISPLAY_BRIGHTNESS,
+    IOCTL_VIDEO_QUERY_SUPPORTED_BRIGHTNESS, IOCTL_VIDEO_SET_DISPLAY_BRIGHTNESS, PHYSICAL_MONITOR,
 };
-use windows::Win32::Foundation::{BOOL, E_FAIL, HANDLE, LPARAM, RECT};
+use windows::Win32::Foundation::{CloseHandle, BOOL, HANDLE, LPARAM, RECT};
 use windows::Win32::Graphics::Gdi::{
     EnumDisplayDevicesW, EnumDisplayMonitors, GetMonitorInfoW, DISPLAY_DEVICEW,
     DISPLAY_DEVICE_ATTACHED_TO_DESKTOP, DISPLAY_DEVICE_MIRRORING_DRIVER, HDC, HMONITOR,
@@ -26,24 +30,27 @@ use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::System::Ole::{
     SafeArrayAccessData, SafeArrayGetLBound, SafeArrayGetUBound, SafeArrayUnaccessData,
 };
-use windows::Win32::System::Variant::{
-    VariantClear, VariantInit, VARIANT, VT_ARRAY, VT_UI1, VT_UINT,
-};
+use windows::Win32::System::Variant::{VariantClear, VARIANT, VT_ARRAY};
 use windows::Win32::System::Wmi::{
-    IWbemClassObject, IWbemLocator, IWbemServices, WbemLocator, CIM_UINT32, CIM_UINT8,
-    WBEM_FLAG_CONNECT_USE_MAX_WAIT, WBEM_FLAG_FORWARD_ONLY, WBEM_RETURN_WHEN_COMPLETE,
+    IWbemClassObject, IWbemLocator, IWbemServices, WbemLocator, WBEM_FLAG_CONNECT_USE_MAX_WAIT,
+    WBEM_FLAG_FORWARD_ONLY,
 };
+use windows::Win32::System::IO::DeviceIoControl;
 
 #[derive(Debug)]
 pub struct Monitor {
     pub id: OsString,
-    pub handle: HANDLE,
+    hphysical: HANDLE,
+    hdevice: HANDLE,
 }
 
 impl Drop for Monitor {
     fn drop(&mut self) {
-        if self.handle.0 != -1 {
-            unsafe { DestroyPhysicalMonitor(self.handle) }.unwrap();
+        if self.hphysical.0 != -1 {
+            unsafe { DestroyPhysicalMonitor(self.hphysical) }.unwrap();
+        }
+        if self.hdevice.0 != -1 {
+            unsafe { CloseHandle(self.hdevice) }.unwrap();
         }
     }
 }
@@ -100,7 +107,7 @@ fn get_monitor_ids() -> BTreeMap<OsString, OsString> {
     monitor_ids
 }
 
-fn get_monitors_ddcci(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<OsString, OsString>) {
+fn get_monitors_gdi(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<OsString, OsString>) {
     fn get_monitor_info(hmonitor: HMONITOR) -> Option<MONITORINFOEXW> {
         let mut info: mem::MaybeUninit<MONITORINFOEXW> = mem::MaybeUninit::uninit();
         unsafe { info.assume_init_mut() }.monitorInfo.cbSize =
@@ -165,37 +172,25 @@ fn get_monitors_ddcci(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<Os
                 );
                 continue;
             };
+            let hphysical = phy.hPhysicalMonitor;
+            let hdevice = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&id)
+                .map_or(HANDLE(-1), |f| HANDLE(f.into_raw_handle() as isize));
             monitors.push(Monitor {
                 id,
-                handle: phy.hPhysicalMonitor,
+                hphysical,
+                hdevice,
             });
         }
     }
 }
 
-fn get_monitors_wmi(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<OsString, OsString>) {
-    for (_, id) in monitor_ids.iter_mut() {
-        let mut monitor = Monitor {
-            id: mem::take(id),
-            handle: HANDLE(-1),
-        };
-        if monitor
-            .get_wmi_instance(&L!("WmiMonitorID"))
-            .is_ok_and(|obj| obj.is_some())
-        {
-            monitors.push(monitor);
-        } else {
-            mem::swap(id, &mut monitor.id);
-        }
-    }
-    monitor_ids.retain(|_, v| !v.is_empty());
-}
-
 pub fn get_monitors() -> Vec<Monitor> {
     let mut monitors = Vec::new();
     let mut monitor_ids = get_monitor_ids();
-    get_monitors_ddcci(&mut monitors, &mut monitor_ids);
-    get_monitors_wmi(&mut monitors, &mut monitor_ids);
+    get_monitors_gdi(&mut monitors, &mut monitor_ids);
     debug_assert!(
         monitor_ids.is_empty(),
         "cannot get interfaces for some display devices: {monitor_ids:?}"
@@ -209,14 +204,14 @@ pub struct Reply {
     pub maximum: u32,
 }
 
-fn get_vcp(handle: HANDLE, code: u8) -> Result<Reply> {
+fn ddcci_get_vcp(hphysical: HANDLE, code: u8) -> Result<Reply> {
     let mut reply = Reply {
         current: 0,
         maximum: 0,
     };
     if unsafe {
         GetVCPFeatureAndVCPFeatureReply(
-            handle,
+            hphysical,
             code,
             None,
             &mut reply.current,
@@ -230,11 +225,74 @@ fn get_vcp(handle: HANDLE, code: u8) -> Result<Reply> {
     }
 }
 
-fn set_vcp(handle: HANDLE, code: u8, value: u32) -> Result<()> {
-    if unsafe { SetVCPFeature(handle, code, value) } == 0 {
+fn ddcci_set_vcp(hpysical: HANDLE, code: u8, value: u32) -> Result<()> {
+    if unsafe { SetVCPFeature(hpysical, code, value) } == 0 {
         Err(Error::from_win32())
     } else {
         Ok(())
+    }
+}
+
+// ioctl functions are copied from the "brightness" crate
+
+fn ioctl_query_supported_brightness(hdevice: HANDLE) -> Result<Vec<u8>> {
+    let mut bytes_returned = 0;
+    let mut out_buffer = Vec::<u8>::with_capacity(256);
+    unsafe {
+        DeviceIoControl(
+            hdevice,
+            IOCTL_VIDEO_QUERY_SUPPORTED_BRIGHTNESS,
+            None,
+            0,
+            Some(out_buffer.as_mut_ptr() as *mut c_void),
+            out_buffer.capacity() as u32,
+            Some(&mut bytes_returned),
+            None,
+        )
+    }?;
+    unsafe { out_buffer.set_len(bytes_returned as usize) };
+    Ok(out_buffer)
+}
+
+fn ioctl_query_display_brightness(hdevice: HANDLE) -> Result<u8> {
+    let mut display_brightness: mem::MaybeUninit<DISPLAY_BRIGHTNESS> = mem::MaybeUninit::uninit();
+    unsafe {
+        DeviceIoControl(
+            hdevice,
+            IOCTL_VIDEO_QUERY_DISPLAY_BRIGHTNESS,
+            None,
+            0,
+            Some(display_brightness.as_mut_ptr() as *mut c_void),
+            mem::size_of::<DISPLAY_BRIGHTNESS>() as u32,
+            None,
+            None,
+        )
+    }?;
+    let display_brightness = unsafe { display_brightness.assume_init() };
+    Ok(match display_brightness.ucDisplayPolicy as u32 {
+        DISPLAYPOLICY_AC => display_brightness.ucACBrightness,
+        DISPLAYPOLICY_DC => display_brightness.ucDCBrightness,
+        _ => unreachable!(),
+    })
+}
+
+fn ioctl_set_display_brightness(hdevice: HANDLE, value: u8) -> Result<()> {
+    let mut display_brightness = DISPLAY_BRIGHTNESS {
+        ucACBrightness: value,
+        ucDCBrightness: value,
+        ucDisplayPolicy: 3, // DISPLAYPOLICY_BOTH
+    };
+    unsafe {
+        DeviceIoControl(
+            hdevice,
+            IOCTL_VIDEO_SET_DISPLAY_BRIGHTNESS,
+            Some(&mut display_brightness as *mut DISPLAY_BRIGHTNESS as *mut c_void),
+            mem::size_of::<DISPLAY_BRIGHTNESS>() as u32,
+            None,
+            0,
+            None,
+            None,
+        )
     }
 }
 
@@ -261,33 +319,35 @@ impl Feature {
 
 impl Monitor {
     pub fn get_feature(&self, feature: Feature) -> Result<Reply> {
-        if self.handle.0 == -1 {
-            self.get_wmi_feature(feature)
-        } else {
-            let r = get_vcp(self.handle, feature.vcp_code());
-            if r.is_err() {
-                let r = self.get_wmi_feature(feature);
-                if r.is_ok() {
-                    return r;
-                }
+        let r = ddcci_get_vcp(self.hphysical, feature.vcp_code());
+        if r.is_err() && feature == Feature::Luminance {
+            let r = ioctl_query_display_brightness(self.hdevice).map(|value| Reply {
+                current: value as u32,
+                maximum: 100,
+            });
+            if r.is_ok() {
+                return r;
             }
-            r
         }
+        r
     }
 
     pub fn set_feature(&self, feature: Feature, value: u32) -> Result<()> {
-        if self.handle.0 == -1 {
-            self.set_wmi_feature(feature, value)
-        } else {
-            let r = set_vcp(self.handle, feature.vcp_code(), value);
-            if r.is_err() {
-                let r = self.set_wmi_feature(feature, value);
-                if r.is_ok() {
-                    return r;
-                }
+        let r = ddcci_set_vcp(self.hphysical, feature.vcp_code(), value);
+        if r.is_err() && feature == Feature::Luminance {
+            let r = ioctl_query_supported_brightness(self.hdevice).and_then(|levels| {
+                let value = levels
+                    .iter()
+                    .min_by_key(|level| value.abs_diff(**level as u32))
+                    .copied()
+                    .unwrap_or(value as u8);
+                ioctl_set_display_brightness(self.hdevice, value)
+            });
+            if r.is_ok() {
+                return r;
             }
-            r
         }
+        r
     }
 }
 
@@ -365,126 +425,6 @@ impl Monitor {
             .transpose();
         unsafe { VariantClear(&mut variant) }?;
         s
-    }
-
-    fn get_wmi_feature(&self, feature: Feature) -> Result<Reply> {
-        if feature != Feature::Luminance {
-            return Err(Error::new(
-                E_FAIL,
-                HSTRING::from_wide(&L!("Feature not supported."))?,
-            ));
-        }
-        let Some(instance) = self.get_wmi_instance(&L!("WmiMonitorBrightness"))? else {
-            return Err(Error::new(
-                E_FAIL,
-                HSTRING::from_wide(&L!("Failed to get the WmiMonitorBrightness instance."))?,
-            ));
-        };
-        let mut variant: mem::MaybeUninit<VARIANT> = mem::MaybeUninit::uninit();
-        unsafe {
-            instance.Get(
-                PCWSTR::from_raw(L!("CurrentBrightness\0").as_ptr()),
-                0,
-                variant.as_mut_ptr(),
-                None,
-                None,
-            )
-        }?;
-        let mut variant = unsafe { variant.assume_init() };
-        let brightness = unsafe { variant.Anonymous.Anonymous.Anonymous.bVal };
-        unsafe { VariantClear(&mut variant) }?;
-        Ok(Reply {
-            current: brightness as u32,
-            maximum: 100,
-        })
-    }
-
-    fn set_wmi_feature(&self, feature: Feature, value: u32) -> Result<()> {
-        if feature != Feature::Luminance {
-            return Err(Error::new(
-                E_FAIL,
-                HSTRING::from_wide(&L!("Feature not supported."))?,
-            ));
-        }
-        let services = get_wmi_services()?;
-        let Some(instance) = self.get_wmi_instance(&L!("WmiMonitorBrightnessMethods"))? else {
-            return Err(Error::new(
-                E_FAIL,
-                HSTRING::from_wide(&L!(
-                    "Failed to get the WmiMonitorBrightnessMethods instance."
-                ))?,
-            ));
-        };
-        let mut class = None;
-        unsafe {
-            services.GetObject(
-                &BSTR::from_wide(&L!("WmiMonitorBrightnessMethods"))?,
-                WBEM_RETURN_WHEN_COMPLETE,
-                None,
-                Some(&mut class),
-                None,
-            )
-        }?;
-        let class = class.unwrap();
-        let mut signature = None;
-        unsafe {
-            class.GetMethod(
-                PCWSTR::from_raw(L!("WmiSetBrightness\0").as_ptr()),
-                0,
-                &mut signature,
-                ptr::null_mut(),
-            )
-        }?;
-        let signature = signature.unwrap();
-        let param = unsafe { signature.SpawnInstance(0) }?;
-        let mut var = unsafe { VariantInit() };
-        unsafe { var.Anonymous.Anonymous.deref_mut().vt.0 = VT_UINT.0 };
-        unsafe { var.Anonymous.Anonymous.deref_mut().Anonymous.uintVal = 0 };
-        unsafe {
-            param.Put(
-                PCWSTR::from_raw(L!("Timeout\0").as_ptr()),
-                0,
-                &var,
-                CIM_UINT32.0,
-            )
-        }?;
-        unsafe { VariantClear(&mut var) }?;
-        var = unsafe { VariantInit() };
-        unsafe { var.Anonymous.Anonymous.deref_mut().vt.0 = VT_UI1.0 };
-        unsafe { var.Anonymous.Anonymous.deref_mut().Anonymous.bVal = value as u8 };
-        unsafe {
-            param.Put(
-                PCWSTR::from_raw(L!("Brightness\0").as_ptr()),
-                0,
-                &var,
-                CIM_UINT8.0,
-            )
-        }?;
-        unsafe { VariantClear(&mut var) }?;
-        let mut path_var: mem::MaybeUninit<VARIANT> = mem::MaybeUninit::uninit();
-        unsafe {
-            instance.Get(
-                PCWSTR::from_raw(L!("__PATH\0").as_ptr()),
-                0,
-                path_var.as_mut_ptr(),
-                None,
-                None,
-            )
-        }?;
-        let path_var = unsafe { path_var.assume_init() };
-        let path: &BSTR = unsafe { &path_var.Anonymous.Anonymous.Anonymous.bstrVal };
-        unsafe {
-            services.ExecMethod(
-                path,
-                &BSTR::from_wide(&L!("WmiSetBrightness"))?,
-                WBEM_RETURN_WHEN_COMPLETE,
-                None,
-                &param,
-                None,
-                None,
-            )
-        }?;
-        Ok(())
     }
 }
 
