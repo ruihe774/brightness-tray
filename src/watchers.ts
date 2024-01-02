@@ -46,7 +46,7 @@ function watchInner(
     return watch(
         source,
         (newV, oldV, onCleanup) => {
-            if (oldValue === voidSymbol) {
+            if (oldValue == voidSymbol) {
                 oldValue = oldV;
             }
             return debounced(newV, onCleanup);
