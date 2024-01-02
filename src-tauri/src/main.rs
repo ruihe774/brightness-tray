@@ -20,7 +20,7 @@ fn main() {
         .system_tray(SystemTray::new().with_menu(
             SystemTrayMenu::new().add_item(CustomMenuItem::new("quit".to_owned(), "Quit")),
         ))
-        .manage(monitors::MonitorManager::new())
+        .manage(monitors::Monitors::new())
         .invoke_handler(tauri::generate_handler![
             monitors::refresh_monitors,
             monitors::get_monitors,
