@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::ffi::{c_void, OsString};
 use std::fmt::Write as _;
 use std::fs::OpenOptions;
-use std::mem;
+use std::mem::{size_of, take, transmute, MaybeUninit};
 use std::num::NonZeroUsize;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::os::windows::io::IntoRawHandle;
@@ -12,8 +12,9 @@ use std::ptr;
 
 use once_cell::race::OnceNonZeroUsize;
 use wide::L;
+use windows::core::Interface as _;
 pub use windows::core::{Error, Result};
-use windows::core::{Interface, BSTR, PCWSTR};
+use windows::core::{BSTR, PCWSTR};
 use windows::Win32::Devices::Display::{
     DestroyPhysicalMonitor, GetNumberOfPhysicalMonitorsFromHMONITOR,
     GetPhysicalMonitorsFromHMONITOR, GetVCPFeatureAndVCPFeatureReply, SetVCPFeature,
@@ -56,7 +57,7 @@ impl Drop for Monitor {
 }
 
 fn pcwstr_to_osstring(s: &[u16]) -> OsString {
-    let len = s.iter().position(|ch| *ch == 0).unwrap_or(s.len());
+    let len = s.iter().position(|&ch| ch == 0).unwrap_or(s.len());
     OsString::from_wide(&s[..len])
 }
 
@@ -66,8 +67,8 @@ fn get_monitor_ids() -> BTreeMap<OsString, OsString> {
         device_num: u32,
         flags: u32,
     ) -> Option<DISPLAY_DEVICEW> {
-        let mut device: mem::MaybeUninit<DISPLAY_DEVICEW> = mem::MaybeUninit::uninit();
-        unsafe { device.assume_init_mut() }.cb = mem::size_of::<DISPLAY_DEVICEW>() as u32;
+        let mut device = MaybeUninit::<DISPLAY_DEVICEW>::uninit();
+        unsafe { device.assume_init_mut() }.cb = size_of::<DISPLAY_DEVICEW>() as u32;
         unsafe {
             EnumDisplayDevicesW(
                 PCWSTR::from_raw(device_name.map_or(ptr::null(), |name| name.as_ptr())),
@@ -109,10 +110,9 @@ fn get_monitor_ids() -> BTreeMap<OsString, OsString> {
 
 fn get_monitors_gdi(monitors: &mut Vec<Monitor>, monitor_ids: &mut BTreeMap<OsString, OsString>) {
     fn get_monitor_info(hmonitor: HMONITOR) -> Option<MONITORINFOEXW> {
-        let mut info: mem::MaybeUninit<MONITORINFOEXW> = mem::MaybeUninit::uninit();
-        unsafe { info.assume_init_mut() }.monitorInfo.cbSize =
-            mem::size_of::<MONITORINFOEXW>() as u32;
-        unsafe { GetMonitorInfoW(hmonitor, mem::transmute(info.as_mut_ptr())) }
+        let mut info = MaybeUninit::<MONITORINFOEXW>::uninit();
+        unsafe { info.assume_init_mut() }.monitorInfo.cbSize = size_of::<MONITORINFOEXW>() as u32;
+        unsafe { GetMonitorInfoW(hmonitor, transmute(info.as_mut_ptr())) }
             .as_bool()
             .then(|| unsafe { info.assume_init() })
     }
@@ -205,15 +205,23 @@ pub fn get_monitors() -> Vec<Monitor> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Interface {
+    DDCCI,
+    WMI,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Reply {
     pub current: u32,
     pub maximum: u32,
+    pub source: Interface,
 }
 
 fn ddcci_get_vcp(hphysical: HANDLE, code: u8) -> Result<Reply> {
     let mut reply = Reply {
         current: 0,
         maximum: 0,
+        source: Interface::DDCCI,
     };
     if unsafe {
         GetVCPFeatureAndVCPFeatureReply(
@@ -261,7 +269,7 @@ fn ioctl_query_supported_brightness(hdevice: HANDLE) -> Result<Vec<u8>> {
 }
 
 fn ioctl_query_display_brightness(hdevice: HANDLE) -> Result<u8> {
-    let mut display_brightness: mem::MaybeUninit<DISPLAY_BRIGHTNESS> = mem::MaybeUninit::uninit();
+    let mut display_brightness = MaybeUninit::<DISPLAY_BRIGHTNESS>::uninit();
     unsafe {
         DeviceIoControl(
             hdevice,
@@ -269,7 +277,7 @@ fn ioctl_query_display_brightness(hdevice: HANDLE) -> Result<u8> {
             None,
             0,
             Some(display_brightness.as_mut_ptr() as *mut c_void),
-            mem::size_of::<DISPLAY_BRIGHTNESS>() as u32,
+            size_of::<DISPLAY_BRIGHTNESS>() as u32,
             None,
             None,
         )
@@ -293,7 +301,7 @@ fn ioctl_set_display_brightness(hdevice: HANDLE, value: u8) -> Result<()> {
             hdevice,
             IOCTL_VIDEO_SET_DISPLAY_BRIGHTNESS,
             Some(&mut display_brightness as *mut DISPLAY_BRIGHTNESS as *mut c_void),
-            mem::size_of::<DISPLAY_BRIGHTNESS>() as u32,
+            size_of::<DISPLAY_BRIGHTNESS>() as u32,
             None,
             0,
             None,
@@ -330,6 +338,7 @@ impl Monitor {
             let r = ioctl_query_display_brightness(self.hdevice).map(|value| Reply {
                 current: value as u32,
                 maximum: 100,
+                source: Interface::WMI,
             });
             if r.is_ok() {
                 return r;
@@ -344,7 +353,7 @@ impl Monitor {
             let r = ioctl_query_supported_brightness(self.hdevice).and_then(|levels| {
                 let value = levels
                     .iter()
-                    .min_by_key(|level| value.abs_diff(**level as u32))
+                    .min_by_key(|&level| value.abs_diff(*level as u32))
                     .copied()
                     .unwrap_or(value as u8);
                 ioctl_set_display_brightness(self.hdevice, value)
@@ -398,7 +407,7 @@ impl Monitor {
         let Some(instance) = self.get_wmi_instance(&L!("WmiMonitorID"))? else {
             return Ok(None);
         };
-        let mut variant: mem::MaybeUninit<VARIANT> = mem::MaybeUninit::uninit();
+        let mut variant = MaybeUninit::<VARIANT>::uninit();
         unsafe {
             instance.Get(
                 PCWSTR::from_raw(L!("UserFriendlyName\0").as_ptr()),
@@ -421,8 +430,8 @@ impl Monitor {
                         [l as usize..];
                 let buf: Vec<_> = buf
                     .iter()
-                    .take_while(|ch| **ch != 0)
-                    .map(|ch| *ch as u16)
+                    .take_while(|&ch| *ch != 0)
+                    .map(|&ch| ch as u16)
                     .collect();
                 let s = OsString::from_wide(&buf);
                 unsafe { SafeArrayUnaccessData(array) }?;
@@ -456,6 +465,7 @@ pub fn init_com() -> Result<()> {
     }?;
     Ok(())
 }
+
 static WMI_SERVICES: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
 fn create_wmi_services() -> Result<IWbemServices> {
@@ -501,5 +511,5 @@ fn query_wmi(query: &[u16]) -> Result<Option<IWbemClassObject>> {
     let mut objects = [None; 1];
     let mut returned = 0;
     let _ = unsafe { enumerator.Next(1000, &mut objects, &mut returned) };
-    Ok(mem::take(&mut objects[0]))
+    Ok(take(&mut objects[0]))
 }
