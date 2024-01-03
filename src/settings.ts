@@ -7,7 +7,7 @@ export interface Settings {
 }
 
 export default reactive<Settings>({
-    updateInterval: 500,
+    updateInterval: 200,
     ddcPowerOffValue: 6,
     writingMode: "horizontal-tb",
 });

@@ -37,7 +37,7 @@ export default defineComponent({
     },
     methods: {
         handlePowerOff() {
-            monitorManager.updateFeature(
+            monitorManager.setFeature(
                 this.monitorId,
                 "powerstate",
                 Math.min(settings.ddcPowerOffValue, this.powerState!.maximum),
