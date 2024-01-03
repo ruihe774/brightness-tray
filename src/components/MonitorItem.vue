@@ -34,6 +34,9 @@ export default defineComponent({
                 return void 0;
             }
         },
+        icon() {
+            return this.monitor.features[0]?.value.source == "wmi" ? "\ue7f8" : "\ue7f4";
+        },
     },
     methods: {
         handlePowerOff() {
@@ -53,7 +56,7 @@ export default defineComponent({
             :class="[sheet.horizontalFlex, sheet.spreadContent, sheet.centerItems, sheet.cozyLine]"
         >
             <div>
-                <span :class="sheet.bigIcon" aria-label="monitor">&#xE7F4;</span>
+                <span :class="sheet.bigIcon" aria-label="monitor">{{ icon }}</span>
                 <span
                     :class="[sheet.titleFont, sheet.selectable]"
                     style="margin-inline-start: 0.15em"

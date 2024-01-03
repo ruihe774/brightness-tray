@@ -5,10 +5,10 @@ import monitorManager from "../monitor";
 import sheet from "../style.module.sass";
 import settings from "../settings";
 
-const iconMap = {
+const iconMap: { [key: string]: string } = {
     luminance: "\uE706",
     contrast: "\uE793",
-    brightness: "\uE7E8",
+    brightness: "\uE706",
     volume: "\uE767",
     powerstate: "\uE7E8",
 };
@@ -47,7 +47,7 @@ export default defineComponent({
             return this.feature.value.maximum;
         },
         icon() {
-            return (iconMap as { [key: string]: string })[this.featureName];
+            return iconMap[this.featureName];
         },
         update() {
             const { updateInterval } = settings;
