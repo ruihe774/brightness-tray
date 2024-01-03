@@ -1,3 +1,5 @@
+use std::ffi::OsStr;
+
 use monitor::{Feature, Interface, Monitor};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::RwLock;
@@ -33,10 +35,11 @@ pub async fn get_monitors(monitors: State<'_, Monitors>) -> JSResult<Vec<String>
         .collect())
 }
 
-fn get_monitor_by_id<'a>(monitors: &'a Vec<Monitor>, id: &'_ str) -> JSResult<&'a Monitor> {
+fn get_monitor_by_id<'a>(monitors: &'a [Monitor], id: &'_ str) -> JSResult<&'a Monitor> {
+    let id_os: &OsStr = id.as_ref();
     monitors
         .iter()
-        .find(|monitor| monitor.id.to_string_lossy() == id)
+        .find(|monitor| monitor.id == id_os)
         .ok_or_else(|| format!("no such monitor: '{id}'").into())
 }
 
