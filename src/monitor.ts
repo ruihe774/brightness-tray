@@ -82,7 +82,7 @@ export class Manager {
                         if (value) {
                             const item = monitor.features[idx];
                             if (item) {
-                                item.value = value;
+                                Object.assign(item.value, value);
                             } else {
                                 monitor.features.push({
                                     name,
@@ -137,10 +137,13 @@ export class Manager {
                 value,
             });
             await timeout(settings.updateInterval);
-            feature.value = await invoke<Reply>("get_monitor_feature", {
-                id,
-                feature: name,
-            });
+            Object.assign(
+                feature.value,
+                await invoke<Reply>("get_monitor_feature", {
+                    id,
+                    feature: name,
+                }),
+            );
         }
     }
 }

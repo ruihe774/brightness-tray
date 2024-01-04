@@ -16,7 +16,9 @@ const colors = reactive<Colors>({});
 watchThrottled(
     () => panelState.focused,
     async () => {
-        Object.assign(colors, await invoke<Colors>("get_accent_colors"));
+        for (const [name, color] of Object.entries(await invoke<Colors>("get_accent_colors"))) {
+            colors[name] = Object.assign(colors[name] ?? {}, color);
+        }
     },
     { throttle: 1000, immediate: true },
 );
