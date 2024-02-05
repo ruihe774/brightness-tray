@@ -93,7 +93,7 @@ pub async fn get_monitor_feature(
         maximum,
         source: match source {
             Interface::DDCCI => "ddcci",
-            Interface::WMI => "wmi",
+            Interface::IOCTL => "ioctl",
         },
     })
 }

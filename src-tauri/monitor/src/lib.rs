@@ -207,7 +207,7 @@ pub fn get_monitors() -> Vec<Monitor> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Interface {
     DDCCI,
-    WMI,
+    IOCTL,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -342,7 +342,7 @@ impl Monitor {
                 ioctl_query_display_brightness(self.hdevice).map(|value| Reply {
                     current: value as u32,
                     maximum: 100,
-                    source: Interface::WMI,
+                    source: Interface::IOCTL,
                 })
             } else {
                 Err(ERROR_NOT_SUPPORTED.into())
