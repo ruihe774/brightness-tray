@@ -2,13 +2,14 @@ use std::ffi::OsStr;
 
 use monitor::{Feature, Interface, Monitor};
 use serde::{Deserialize, Serialize};
-use tauri::async_runtime::RwLock;
+use tauri::async_runtime::{Mutex, RwLock};
 use tauri::State;
+use tokio::time::{sleep, sleep_until, Duration, Instant};
 
 use crate::util::JSResult;
 
 #[derive(Debug)]
-pub struct Monitors(RwLock<Vec<Monitor>>);
+pub struct Monitors(RwLock<Vec<(Monitor, Mutex<Instant>)>>);
 
 impl Monitors {
     pub const fn new() -> Monitors {
@@ -20,8 +21,9 @@ impl Monitors {
 pub async fn refresh_monitors(monitors: State<'_, Monitors>) -> JSResult<()> {
     let mut monitors = monitors.0.write().await;
     monitors.clear();
+    let stub_instant = Instant::now();
     for monitor in monitor::get_monitors() {
-        monitors.push(monitor);
+        monitors.push((monitor, Mutex::const_new(stub_instant)));
     }
     Ok(())
 }
@@ -31,15 +33,18 @@ pub async fn get_monitors(monitors: State<'_, Monitors>) -> JSResult<Vec<String>
     let monitors = monitors.0.read().await;
     Ok(monitors
         .iter()
-        .map(|monitor| monitor.id.to_string_lossy().into_owned())
+        .map(|(monitor, _)| monitor.id.to_string_lossy().into_owned())
         .collect())
 }
 
-fn get_monitor_by_id<'a>(monitors: &'a [Monitor], id: &'_ str) -> JSResult<&'a Monitor> {
+fn get_monitor_by_id<'a>(
+    monitors: &'a [(Monitor, Mutex<Instant>)],
+    id: &'_ str,
+) -> JSResult<&'a (Monitor, Mutex<Instant>)> {
     let id_os: &OsStr = id.as_ref();
     monitors
         .iter()
-        .find(|monitor| monitor.id == id_os)
+        .find(|(monitor, _)| monitor.id == id_os)
         .ok_or_else(|| format!("no such monitor: '{id}'").into())
 }
 
@@ -49,7 +54,7 @@ pub async fn get_monitor_user_friendly_name(
     id: String,
 ) -> JSResult<Option<String>> {
     let monitors = monitors.0.read().await;
-    let monitor = get_monitor_by_id(&monitors, &id)?;
+    let monitor = &get_monitor_by_id(&monitors, &id)?.0;
     Ok(monitor
         .get_user_friendly_name()?
         .map(|s| s.to_string_lossy().into_owned()))
@@ -74,6 +79,9 @@ pub struct Reply {
     source: &'static str,
 }
 
+// TODO: move it into JS
+const UPDATE_INTERVAL: Duration = Duration::from_millis(200);
+
 #[tauri::command]
 pub async fn get_monitor_feature(
     monitors: State<'_, Monitors>,
@@ -81,13 +89,18 @@ pub async fn get_monitor_feature(
     feature: String,
 ) -> JSResult<Reply> {
     let monitors = monitors.0.read().await;
-    let monitor = get_monitor_by_id(&monitors, &id)?;
+    let (monitor, instant) = get_monitor_by_id(&monitors, &id)?;
     let feature = feature_from_string(feature)?;
+
+    let mut instant = instant.lock().await;
+    sleep_until(*instant).await;
     let monitor::Reply {
         current,
         maximum,
         source,
     } = monitor.get_feature(feature)?;
+    *instant = Instant::now() + UPDATE_INTERVAL;
+
     Ok(Reply {
         current,
         maximum,
@@ -104,9 +117,29 @@ pub async fn set_monitor_feature(
     id: String,
     feature: String,
     value: u32,
-) -> JSResult<()> {
+) -> JSResult<Reply> {
     let monitors = monitors.0.read().await;
-    let monitor = get_monitor_by_id(&monitors, &id)?;
+    let (monitor, instant) = get_monitor_by_id(&monitors, &id)?;
     let feature = feature_from_string(feature)?;
-    Ok(monitor.set_feature(feature, value)?)
+
+    let mut instant = instant.lock().await;
+    sleep_until(*instant).await;
+    monitor.set_feature(feature, value)?;
+
+    sleep(UPDATE_INTERVAL).await;
+    let monitor::Reply {
+        current,
+        maximum,
+        source,
+    } = monitor.get_feature(feature)?;
+    *instant = Instant::now() + UPDATE_INTERVAL;
+
+    Ok(Reply {
+        current,
+        maximum,
+        source: match source {
+            Interface::DDCCI => "ddcci",
+            Interface::IOCTL => "ioctl",
+        },
+    })
 }

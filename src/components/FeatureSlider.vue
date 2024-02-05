@@ -1,9 +1,8 @@
 <script lang="ts">
 import { defineComponent } from "vue";
-import { clamp, debounce } from "lodash-es";
+import { clamp } from "lodash-es";
 import monitorManager from "../monitor";
 import sheet from "../style.module.sass";
-import settings from "../settings";
 
 const iconMap: { [key: string]: string } = {
     luminance: "\uE706",
@@ -31,9 +30,11 @@ export default defineComponent({
     },
     data(): {
         input: number | null;
+        updating: Promise<void>;
     } {
         return {
             input: null,
+            updating: Promise.resolve(),
         };
     },
     computed: {
@@ -49,25 +50,6 @@ export default defineComponent({
         icon() {
             return iconMap[this.featureName];
         },
-        update() {
-            const { updateInterval } = settings;
-            return debounce(
-                (id, name, value) => {
-                    monitorManager.setFeature(id, name, value);
-                },
-                updateInterval,
-                {
-                    leading: true,
-                    maxWait: updateInterval,
-                },
-            );
-        },
-        sync() {
-            const { updateInterval } = settings;
-            return debounce(() => {
-                this.input = null;
-            }, updateInterval * 2);
-        },
     },
     methods: {
         handleInput(event: Event) {
@@ -75,7 +57,7 @@ export default defineComponent({
             const target = e.target! as HTMLInputElement;
             if (!e.isComposing && target.validity.valid) {
                 this.input = Number(target.value);
-                this.update(this.monitorId, this.featureName, this.input);
+                this.update();
             }
         },
         handleWheel(event: Event) {
@@ -85,9 +67,29 @@ export default defineComponent({
                 const offset = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : -e.deltaY;
                 const current = Number(target.value);
                 this.input = clamp(Math.round(current + offset * 0.01), 0, this.maximum);
-                this.update(this.monitorId, this.featureName, this.input);
+                this.update();
                 this.sync();
             }
+        },
+        update() {
+            this.updating = this.updating.then(() => {
+                if (this.input != null) {
+                    try {
+                        return monitorManager.setFeature(
+                            this.monitorId,
+                            this.featureName,
+                            this.input,
+                        );
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+            });
+        },
+        sync() {
+            this.updating = this.updating.then(() => {
+                this.input = null;
+            });
         },
     },
 });

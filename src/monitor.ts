@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api";
 import { reactive, toRaw, DeepReadonly } from "vue";
-import settings from "./settings";
 
 export interface Reply {
     current: number;
@@ -17,12 +16,6 @@ export interface Monitor {
     id: string;
     name: string | null;
     features: Feature[];
-}
-
-function timeout(millis: number): Promise<undefined> {
-    return new Promise((resolve) => {
-        setTimeout(resolve, millis);
-    });
 }
 
 export class Manager {
@@ -66,11 +59,7 @@ export class Manager {
                     const featureNames = monitor.features.length
                         ? monitor.features.map((feature) => feature.name)
                         : ["luminance", "contrast", "brightness", "volume", "powerstate"];
-                    let first = true;
                     for (const name of featureNames) {
-                        if (!first) {
-                            await timeout(settings.updateInterval);
-                        }
                         let value: Reply | undefined;
                         try {
                             value = await invoke<Reply>("get_monitor_feature", {
@@ -92,7 +81,6 @@ export class Manager {
                         } else if (idx != -1) {
                             monitor.features.splice(idx, 1);
                         }
-                        first = false;
                     }
                 })(),
             );
@@ -131,17 +119,12 @@ export class Manager {
     async setFeature(id: string, name: string, value: number): Promise<void> {
         const feature = this.getFeature(id, name) as Feature;
         if (feature.value.current != value) {
-            await invoke<void>("set_monitor_feature", {
-                id,
-                feature: name,
-                value,
-            });
-            await timeout(settings.updateInterval);
             Object.assign(
                 feature.value,
-                await invoke<Reply>("get_monitor_feature", {
+                await invoke<Reply>("set_monitor_feature", {
                     id,
                     feature: name,
+                    value,
                 }),
             );
         }
