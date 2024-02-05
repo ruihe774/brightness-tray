@@ -21,7 +21,7 @@ use windows::Win32::Devices::Display::{
     DISPLAYPOLICY_AC, DISPLAYPOLICY_DC, DISPLAY_BRIGHTNESS, IOCTL_VIDEO_QUERY_DISPLAY_BRIGHTNESS,
     IOCTL_VIDEO_QUERY_SUPPORTED_BRIGHTNESS, IOCTL_VIDEO_SET_DISPLAY_BRIGHTNESS, PHYSICAL_MONITOR,
 };
-use windows::Win32::Foundation::{CloseHandle, BOOL, HANDLE, LPARAM, RECT};
+use windows::Win32::Foundation::{CloseHandle, BOOL, ERROR_NOT_SUPPORTED, HANDLE, LPARAM, RECT};
 use windows::Win32::Graphics::Gdi::{
     EnumDisplayDevicesW, EnumDisplayMonitors, GetMonitorInfoW, DISPLAY_DEVICEW,
     DISPLAY_DEVICE_ATTACHED_TO_DESKTOP, DISPLAY_DEVICE_MIRRORING_DRIVER, HDC, HMONITOR,
@@ -332,37 +332,43 @@ impl Feature {
 }
 
 impl Monitor {
+    fn is_builtin(&self) -> bool {
+        self.id.as_encoded_bytes().starts_with(b"\\\\?\\LCD")
+    }
+
     pub fn get_feature(&self, feature: Feature) -> Result<Reply> {
-        let r = ddcci_get_vcp(self.hphysical, feature.vcp_code());
-        if r.is_err() && feature == Feature::Luminance {
-            let r = ioctl_query_display_brightness(self.hdevice).map(|value| Reply {
-                current: value as u32,
-                maximum: 100,
-                source: Interface::WMI,
-            });
-            if r.is_ok() {
-                return r;
+        if self.is_builtin() {
+            if feature == Feature::Luminance {
+                ioctl_query_display_brightness(self.hdevice).map(|value| Reply {
+                    current: value as u32,
+                    maximum: 100,
+                    source: Interface::WMI,
+                })
+            } else {
+                Err(ERROR_NOT_SUPPORTED.into())
             }
+        } else {
+            ddcci_get_vcp(self.hphysical, feature.vcp_code())
         }
-        r
     }
 
     pub fn set_feature(&self, feature: Feature, value: u32) -> Result<()> {
-        let r = ddcci_set_vcp(self.hphysical, feature.vcp_code(), value);
-        if r.is_err() && feature == Feature::Luminance {
-            let r = ioctl_query_supported_brightness(self.hdevice).and_then(|levels| {
-                let value = levels
-                    .iter()
-                    .min_by_key(|&level| value.abs_diff(*level as u32))
-                    .copied()
-                    .unwrap_or(value as u8);
-                ioctl_set_display_brightness(self.hdevice, value)
-            });
-            if r.is_ok() {
-                return r;
+        if self.is_builtin() {
+            if feature == Feature::Luminance {
+                ioctl_query_supported_brightness(self.hdevice).and_then(|levels| {
+                    let value = levels
+                        .iter()
+                        .min_by_key(|&level| value.abs_diff(*level as u32))
+                        .copied()
+                        .unwrap_or(value as u8);
+                    ioctl_set_display_brightness(self.hdevice, value)
+                })
+            } else {
+                Err(ERROR_NOT_SUPPORTED.into())
             }
+        } else {
+            ddcci_set_vcp(self.hphysical, feature.vcp_code(), value)
         }
-        r
     }
 }
 
